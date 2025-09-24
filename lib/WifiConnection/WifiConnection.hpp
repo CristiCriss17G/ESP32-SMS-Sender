@@ -27,6 +27,12 @@ public:
     WifiStatus();
 
     /**
+     * @brief Destroy the Wifi Status object
+     *
+     */
+    ~WifiStatus();
+
+    /**
      * @brief Get the connection status
      *
      * @return true
@@ -90,11 +96,34 @@ private:
 class WifiConnection
 {
 public:
+    /**
+     * @brief Construct a new Wifi Connection object
+     *
+     * @param settings
+     */
     WifiConnection(Settings &settings);
     ~WifiConnection();
 
+    /**
+     * @brief Connect to the WiFi network using stored settings
+     *
+     * @return connect_t
+     */
     connect_t connect();
+
+    /**
+     * @brief Disconnect from the WiFi network
+     *
+     * @return true
+     * @return false
+     */
     bool disconnect();
+
+    /**
+     * @brief Get the Status object
+     *
+     * @return WifiStatus&
+     */
     WifiStatus &getStatus();
 
 private:
