@@ -1,38 +1,5 @@
 #include "GSettings.hpp"
 
-WifiStatus::WifiStatus() : connected(false), ipAddress("") {}
-
-bool WifiStatus::getConnected()
-{
-    return connected;
-}
-
-void WifiStatus::setConnected(bool connected)
-{
-    this->connected = connected;
-}
-
-String WifiStatus::getIpAddress()
-{
-    return ipAddress;
-}
-
-void WifiStatus::setIpAddress(String ipAddress)
-{
-    this->ipAddress = ipAddress;
-}
-
-void WifiStatus::toJson(JsonObject &root)
-{
-    root["connected"] = connected;
-    root["ipAddress"] = ipAddress;
-}
-
-String WifiStatus::toString()
-{
-    return "Connected: " + String(connected) + ", IP Address: " + ipAddress;
-}
-
 Settings::Settings() : deviceName("ESP32-BLE-Example"), ssid(""), password("") {}
 
 String Settings::getDeviceName()
