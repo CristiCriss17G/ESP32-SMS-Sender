@@ -4,67 +4,6 @@
 #include <ArduinoJson.h>
 
 /**
- * @brief Class to store connection status and IP address
- *
- */
-class WifiStatus
-{
-public:
-    /**
-     * @brief Construct a new Wifi Status object
-     *
-     */
-    WifiStatus();
-
-    /**
-     * @brief Get the Connected object
-     *
-     * @return true
-     * @return false
-     */
-    bool getConnected();
-
-    /**
-     * @brief Set the Connected object
-     *
-     * @param connected
-     */
-    void setConnected(bool connected);
-
-    /**
-     * @brief Get the Ip Address object
-     *
-     * @return String
-     */
-    String getIpAddress();
-
-    /**
-     * @brief Set the Ip Address object
-     *
-     * @param ipAddress
-     */
-    void setIpAddress(String ipAddress);
-
-    /**
-     * @brief Serialize the object to a JSON string
-     *
-     * @param root
-     */
-    void toJson(JsonObject &root);
-
-    /**
-     * @brief Get the String object
-     *
-     * @return String
-     */
-    String toString();
-
-private:
-    bool connected = false;
-    String ipAddress = "";
-};
-
-/**
  * @brief Class to store settings
  *
  */

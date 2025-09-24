@@ -6,6 +6,7 @@
 #include <NimBLEDevice.h>
 #include <ArduinoJson.h>
 #include "GSettings.hpp"
+#include "WifiConnection.hpp"
 
 // BLE parameters
 #define BLE_DEVICE_NAME "ESP32-BLE-Example"
@@ -34,14 +35,14 @@ protected:
 class CharacteristicCallbacks : public NimBLECharacteristicCallbacks
 {
 public:
-    CharacteristicCallbacks(WifiStatus &wifiStatus, Settings &settings, NimBLECharacteristic *&notifyCharacteristic);
+    CharacteristicCallbacks(Settings &settings, NimBLECharacteristic *&notifyCharacteristic, WifiConnection *&wifiConnection);
     void onRead(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) override;
     void onWrite(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) override;
 
 protected:
     Preferences preferences;
-    WifiStatus &wifiStatus;
     Settings &settings;
+    WifiConnection *&wifiConnection;
     NimBLECharacteristic *&notifyCharacteristic;
 };
 

@@ -16,7 +16,7 @@ void ServerCallbacks::onDisconnect(NimBLEServer *pServer, NimBLEConnInfo &connIn
 {
     deviceConnected = false;
     Serial.println("Client disconnected");
-    if (!wifiStatus.getConnected())
+    if (!wifiStatus.isWifiConnected())
     {
         // Resume advertising since WiFi is not connected
         pAdvertising->start();
@@ -34,7 +34,7 @@ bool ServerCallbacks::isDeviceConnected()
     return deviceConnected;
 }
 
-CharacteristicCallbacks::CharacteristicCallbacks(WifiStatus &wifiStatus, Settings &settings, NimBLECharacteristic *&notifyCharacteristic) : wifiStatus(wifiStatus), settings(settings), notifyCharacteristic(notifyCharacteristic)
+CharacteristicCallbacks::CharacteristicCallbacks(Settings &settings, NimBLECharacteristic *&notifyCharacteristic, WifiConnection *&wifiConnection) : settings(settings), notifyCharacteristic(notifyCharacteristic), wifiConnection(wifiConnection)
 {
 }
 
@@ -44,7 +44,7 @@ void CharacteristicCallbacks::onRead(NimBLECharacteristic *pCharacteristic, NimB
     // Allocate the JSON document
     JsonDocument doc;
     JsonObject wifiS = doc["wifiStatus"].to<JsonObject>();
-    wifiStatus.toJson(wifiS);
+    wifiConnection->getStatus().toJson(wifiS);
     JsonObject settingsS = doc["settings"].to<JsonObject>();
     settings.toJson(settingsS);
     String output;
@@ -89,32 +89,32 @@ void CharacteristicCallbacks::onWrite(NimBLECharacteristic *pCharacteristic, Nim
         {
             settings.save();
         }
-        if (tryWifiConnect && data_send != nullptr)
+        if (tryWifiConnect && wifiConnection != nullptr)
         {
-            if (data_send->isConnected())
+            if (wifiConnection->getStatus().isWifiConnected())
             {
                 Serial.println("Disconnecting from WiFi...");
-                data_send->disconnect();
+                wifiConnection->disconnect();
             }
             Serial.println("Connecting to WiFi...");
-            HTTPTransmission::connect_t result = data_send->connect();
+            connect_t result = wifiConnection->connect();
             if (result.isConnected)
             {
                 Serial.println("Connected to WiFi!");
-                wifiStatus.setConnected(true);
-                wifiStatus.setIpAddress(result.ip->toString());
+                wifiConnection->getStatus().setWifiConnected(true);
+                wifiConnection->getStatus().setIpAddress(*result.ip);
                 if (notifyCharacteristic != nullptr)
                 {
-                    notifyCharacteristic->notify("S:WC,NR,IP:" + wifiStatus.getIpAddress());
+                    notifyCharacteristic->notify("S:WC,NR,IP:" + wifiConnection->getStatus().getIpAddress());
                 }
             }
             else
             {
                 Serial.println("Failed to connect to WiFi!");
-                wifiStatus.setConnected(false);
+                wifiConnection->getStatus().setWifiConnected(false);
                 if (notifyCharacteristic != nullptr)
                 {
-                    notifyCharacteristic->notify("S:WF");
+                    notifyCharacteristic->notify(String("S:WF,NR"));
                 }
             }
         }
@@ -123,7 +123,7 @@ void CharacteristicCallbacks::onWrite(NimBLECharacteristic *pCharacteristic, Nim
             Serial.println("New server info received! Needs restart to apply changes.");
             if (notifyCharacteristic != nullptr)
             {
-                notifyCharacteristic->notify("S:SI,NR");
+                notifyCharacteristic->notify(String("S:SI,NR"));
             }
         }
         if (doc["restart"].is<bool>() && doc["restart"].as<bool>())
