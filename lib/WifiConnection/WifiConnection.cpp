@@ -2,6 +2,14 @@
 
 WifiStatus::WifiStatus() : connection{false, NULL} {}
 
+WifiStatus::~WifiStatus()
+{
+    if (connection.ip)
+    {
+        delete connection.ip;
+    }
+}
+
 bool WifiStatus::isWifiConnected()
 {
     return connection.isConnected;
