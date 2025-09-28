@@ -1,38 +1,86 @@
+/**
+ * @file GSettings.cpp
+ * @brief Implementation of global settings management
+ */
+
 #include "GSettings.hpp"
 
-Settings::Settings() : deviceName("ESP32-BLE-Example"), ssid(""), password("") {}
+/**
+ * @brief Construct a new GSettings object with default values
+ *
+ * Initializes all settings with sensible defaults. The device name
+ * defaults to "ESP32-BLE-Example", while WiFi credentials start empty.
+ */
+GSettings::GSettings() : deviceName("ESP32-BLE-Example"), ssid(""), password("") {}
 
-String Settings::getDeviceName()
+/**
+ * @brief Get the current device name
+ *
+ * @return String The device name used for BLE advertising
+ */
+String GSettings::getDeviceName()
 {
     return deviceName;
 }
 
-void Settings::setDeviceName(String deviceName)
+/**
+ * @brief Set a new device name
+ *
+ * @param deviceName New device name for BLE advertising and identification
+ */
+void GSettings::setDeviceName(String deviceName)
 {
     this->deviceName = deviceName;
 }
 
-String Settings::getSsid()
+/**
+ * @brief Get the current WiFi SSID
+ *
+ * @return String The WiFi network name for connection attempts
+ */
+String GSettings::getSsid()
 {
     return ssid;
 }
 
-void Settings::setSsid(String ssid)
+/**
+ * @brief Set a new WiFi SSID
+ *
+ * @param ssid WiFi network name to use for connection attempts
+ */
+void GSettings::setSsid(String ssid)
 {
     this->ssid = ssid;
 }
 
-String Settings::getPassword()
+/**
+ * @brief Get the current WiFi password
+ *
+ * @return String The WiFi password for network authentication
+ */
+String GSettings::getPassword()
 {
     return password;
 }
 
-void Settings::setPassword(String password)
+/**
+ * @brief Set a new WiFi password
+ *
+ * @param password WiFi password for network authentication (stored as plaintext)
+ */
+void GSettings::setPassword(String password)
 {
     this->password = password;
 }
 
-void Settings::load()
+/**
+ * @brief Load settings from ESP32 persistent storage
+ *
+ * Reads stored configuration from ESP32 NVS (Non-Volatile Storage).
+ * If no stored values exist, the current default values are retained.
+ * Uses the "global-settings" namespace for storage organization.
+ */
+void GSettings::load()
 {
     preferences.begin("global-settings", false);
     deviceName = preferences.getString("deviceName", deviceName);
@@ -41,7 +89,14 @@ void Settings::load()
     preferences.end();
 }
 
-void Settings::save()
+/**
+ * @brief Save current settings to ESP32 persistent storage
+ *
+ * Writes all current configuration values to ESP32 NVS for persistence
+ * across device restarts. Uses the "global-settings" namespace and
+ * ensures atomic write operations.
+ */
+void GSettings::save()
 {
     preferences.begin("global-settings", false);
     preferences.putString("deviceName", deviceName);
@@ -50,7 +105,16 @@ void Settings::save()
     preferences.end();
 }
 
-void Settings::toJson(JsonObject &root)
+/**
+ * @brief Convert settings to JSON format with security considerations
+ *
+ * Serializes current settings to a JSON object suitable for API responses
+ * or BLE communication. For security, passwords are partially masked by
+ * showing only the first 4 characters followed by "****".
+ *
+ * @param root JSON object reference to populate with settings data
+ */
+void GSettings::toJson(JsonObject &root)
 {
     root["deviceName"] = deviceName;
     root["ssid"] = ssid;
