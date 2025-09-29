@@ -176,7 +176,7 @@ connect_t WifiConnection::connect()
     }
     if (WiFi.status() != WL_CONNECTED && i == 240)
     {
-        Serial.println("Nu s-a putut conecta la retea");
+        Serial.println("Could not connect to network");
         isConnectionTrying = false;
         return {false, NULL};
     }
