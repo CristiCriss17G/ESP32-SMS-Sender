@@ -166,15 +166,15 @@ connect_t WifiConnection::connect()
     WiFi.setAutoReconnect(true);
     WiFi.begin(settings.getSsid().c_str(), settings.getPassword().c_str());
     Serial.println("Connecting to WiFi...");
-    int maxRetries = 20; // Wait for a maximum of 20 seconds
+    int maxRetries = 40; // Wait for a maximum of 20 seconds (40 * 500ms = 20s)
     int i = 0;
-    while (WiFi.status() != WL_CONNECTED && i < 240)
+    while (WiFi.status() != WL_CONNECTED && i < maxRetries)
     {
         delay(500);
         Serial.print(".");
         i++;
     }
-    if (WiFi.status() != WL_CONNECTED && i == 240)
+    if (WiFi.status() != WL_CONNECTED && i == maxRetries)
     {
         Serial.println("Could not connect to network");
         isConnectionTrying = false;
