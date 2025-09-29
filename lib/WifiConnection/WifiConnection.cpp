@@ -2,14 +2,14 @@
 
 /**
  * @brief Construct a new WifiStatus object
- * 
+ *
  * Initializes the WiFi status with disconnected state and null IP address.
  */
 WifiStatus::WifiStatus() : connection{false, nullptr} {}
 
 /**
  * @brief Destroy the WifiStatus object
- * 
+ *
  * Cleans up allocated IP address memory if it exists.
  */
 WifiStatus::~WifiStatus()
@@ -22,7 +22,7 @@ WifiStatus::~WifiStatus()
 
 /**
  * @brief Get the current WiFi connection status
- * 
+ *
  * @return true if WiFi is connected
  * @return false if WiFi is disconnected
  */
@@ -33,9 +33,9 @@ bool WifiStatus::isWifiConnected()
 
 /**
  * @brief Set the WiFi connection status
- * 
+ *
  * Updates the internal connection state flag.
- * 
+ *
  * @param connected true to mark as connected, false for disconnected
  */
 void WifiStatus::setWifiConnected(bool connected)
@@ -45,7 +45,7 @@ void WifiStatus::setWifiConnected(bool connected)
 
 /**
  * @brief Get the current IP address as a string
- * 
+ *
  * @return String representation of IP address, or "0.0.0.0" if no IP assigned
  */
 String WifiStatus::getIpAddress()
@@ -55,10 +55,10 @@ String WifiStatus::getIpAddress()
 
 /**
  * @brief Set the IP address from string representation
- * 
+ *
  * Parses string IP address and stores it as IPAddress object.
  * Creates new IPAddress instance and deallocates previous one if it exists.
- * 
+ *
  * @param ipAddress String representation of IP address (e.g., "192.168.1.100")
  */
 void WifiStatus::setIpAddress(String ipAddress)
@@ -69,9 +69,9 @@ void WifiStatus::setIpAddress(String ipAddress)
 
 /**
  * @brief Set the IP address from IPAddress object
- * 
+ *
  * Creates a new IPAddress instance as a copy of the provided address.
- * 
+ *
  * @param ipAddress IPAddress object to copy
  */
 void WifiStatus::setIpAddress(IPAddress ipAddress)
@@ -81,9 +81,9 @@ void WifiStatus::setIpAddress(IPAddress ipAddress)
 
 /**
  * @brief Update the complete connection information
- * 
+ *
  * Replaces the current connection status and IP address with new information.
- * 
+ *
  * @param connection New connection information structure
  */
 void WifiStatus::updateConnection(connect_t connection)
@@ -93,10 +93,10 @@ void WifiStatus::updateConnection(connect_t connection)
 
 /**
  * @brief Serialize WiFi status information to JSON object
- * 
+ *
  * Populates a JSON object with connection status and IP address information.
  * Used for status reporting and API responses.
- * 
+ *
  * @param root JSON object to populate with status information
  */
 void WifiStatus::toJson(JsonObject &root)
@@ -107,7 +107,7 @@ void WifiStatus::toJson(JsonObject &root)
 
 /**
  * @brief Convert WiFi status to human-readable string
- * 
+ *
  * @return String containing connection status and IP address information
  */
 String WifiStatus::toString()
@@ -117,9 +117,9 @@ String WifiStatus::toString()
 
 /**
  * @brief Construct a new WifiConnection object
- * 
+ *
  * Initializes WiFi connection manager with reference to global settings.
- * 
+ *
  * @param settings Reference to global settings containing WiFi credentials
  */
 WifiConnection::WifiConnection(GSettings &settings) : settings(settings), wifiStatus()
@@ -128,7 +128,7 @@ WifiConnection::WifiConnection(GSettings &settings) : settings(settings), wifiSt
 
 /**
  * @brief Destroy the WifiConnection object
- * 
+ *
  * Ensures WiFi disconnection before object destruction.
  */
 WifiConnection::~WifiConnection()
@@ -138,7 +138,7 @@ WifiConnection::~WifiConnection()
 
 /**
  * @brief Attempt to connect to WiFi network using stored settings
- * 
+ *
  * Performs the following operations:
  * - Prevents multiple simultaneous connection attempts
  * - Sets WiFi to station mode and configures hostname
@@ -146,9 +146,9 @@ WifiConnection::~WifiConnection()
  * - Attempts connection using SSID and password from settings
  * - Waits up to 120 seconds for successful connection
  * - Updates internal status on success/failure
- * 
+ *
  * Connection process includes visual feedback via Serial output.
- * 
+ *
  * @return connect_t Structure containing connection result and IP address
  *         - isConnected: true if connection successful
  *         - ip: Pointer to IPAddress object (caller owns memory)
@@ -165,7 +165,7 @@ connect_t WifiConnection::connect()
     WiFi.setHostname(settings.getDeviceName().c_str());
     WiFi.setAutoReconnect(true);
     WiFi.begin(settings.getSsid().c_str(), settings.getPassword().c_str());
-    Serial.println("Connecting");
+    Serial.println("Connecting to WiFi...");
     int maxRetries = 20; // Wait for a maximum of 20 seconds
     int i = 0;
     while (WiFi.status() != WL_CONNECTED && i < 240)
@@ -187,11 +187,11 @@ connect_t WifiConnection::connect()
 
 /**
  * @brief Disconnect from the current WiFi network
- * 
+ *
  * Attempts to cleanly disconnect from WiFi if currently connected.
  * Uses the ESP32 WiFi.disconnect() function with true parameter
  * to also disable WiFi and clear stored settings.
- * 
+ *
  * @return true if disconnection was successful
  * @return false if disconnection failed or already disconnected
  */
@@ -207,7 +207,7 @@ bool WifiConnection::disconnect()
 
 /**
  * @brief Get reference to the WiFi status object
- * 
+ *
  * @return WifiStatus& Reference to internal WiFi status tracker
  */
 WifiStatus &WifiConnection::getStatus()

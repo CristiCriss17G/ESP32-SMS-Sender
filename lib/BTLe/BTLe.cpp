@@ -7,10 +7,10 @@
 
 /**
  * @brief Construct a new ServerCallbacks object
- * 
- * Initializes the server callbacks with WiFi status reference and 
+ *
+ * Initializes the server callbacks with WiFi status reference and
  * obtains the BLE advertising interface.
- * 
+ *
  * @param wifiStatus Reference to WiFi status tracker
  */
 ServerCallbacks::ServerCallbacks(WifiStatus &wifiStatus) : wifiStatus(wifiStatus)
@@ -20,10 +20,10 @@ ServerCallbacks::ServerCallbacks(WifiStatus &wifiStatus) : wifiStatus(wifiStatus
 
 /**
  * @brief Handle BLE client connection event
- * 
+ *
  * Sets the device connected flag and logs connection information
  * including the client's MAC address.
- * 
+ *
  * @param pServer Pointer to the BLE server instance
  * @param connInfo Connection information containing client details
  */
@@ -36,12 +36,12 @@ void ServerCallbacks::onConnect(NimBLEServer *pServer, NimBLEConnInfo &connInfo)
 
 /**
  * @brief Handle BLE client disconnection event
- * 
+ *
  * Updates the device connected flag and resumes BLE advertising
  * if WiFi is not connected, allowing for device reconfiguration.
- * 
+ *
  * @param pServer Pointer to the BLE server instance
- * @param connInfo Connection information containing client details  
+ * @param connInfo Connection information containing client details
  * @param reason Reason code for disconnection
  */
 void ServerCallbacks::onDisconnect(NimBLEServer *pServer, NimBLEConnInfo &connInfo, int reason)
@@ -58,7 +58,7 @@ void ServerCallbacks::onDisconnect(NimBLEServer *pServer, NimBLEConnInfo &connIn
 
 /**
  * @brief Get the BLE advertising interface
- * 
+ *
  * @return NimBLEAdvertising* Pointer to the advertising object
  */
 NimBLEAdvertising *ServerCallbacks::getAdvertising()
@@ -68,7 +68,7 @@ NimBLEAdvertising *ServerCallbacks::getAdvertising()
 
 /**
  * @brief Check current BLE connection status
- * 
+ *
  * @return true if a BLE client is currently connected
  * @return false if no client is connected
  */
@@ -79,9 +79,9 @@ bool ServerCallbacks::isDeviceConnected()
 
 /**
  * @brief Construct a new CharacteristicCallbacks object
- * 
+ *
  * Initializes callback handler with references to settings and WiFi connection managers.
- * 
+ *
  * @param settings Reference to global settings for credential management
  * @param wifiConnection Reference to WiFi connection manager
  */
@@ -91,11 +91,11 @@ CharacteristicCallbacks::CharacteristicCallbacks(GSettings &settings, WifiConnec
 
 /**
  * @brief Handle BLE characteristic read requests
- * 
+ *
  * Responds to client requests for current device status by creating a JSON
  * response containing WiFi connection status and device settings.
  * The response includes sanitized settings (passwords are partially masked).
- * 
+ *
  * JSON Response Format:
  * {
  *   "wifiStatus": {
@@ -108,7 +108,7 @@ CharacteristicCallbacks::CharacteristicCallbacks(GSettings &settings, WifiConnec
  *     "password": "pass****"
  *   }
  * }
- * 
+ *
  * @param pCharacteristic Pointer to the characteristic being read
  * @param connInfo Connection information structure
  */
@@ -128,16 +128,16 @@ void CharacteristicCallbacks::onRead(NimBLECharacteristic *pCharacteristic, NimB
 
 /**
  * @brief Handle BLE characteristic write requests for device configuration
- * 
+ *
  * Processes JSON configuration data sent by BLE clients to update device settings.
  * Supports multiple configuration operations that can be combined in a single request:
- * 
+ *
  * Supported JSON Fields:
  * - "deviceName": Updates BLE device name
- * - "ssid": WiFi network name  
+ * - "ssid": WiFi network name
  * - "password": WiFi network password
  * - "restart": Boolean flag to restart ESP32 after applying changes
- * 
+ *
  * Operation Flow:
  * 1. Validates and parses incoming JSON data
  * 2. Updates device settings if valid data is provided
@@ -145,12 +145,12 @@ void CharacteristicCallbacks::onRead(NimBLECharacteristic *pCharacteristic, NimB
  * 4. Attempts WiFi connection if new credentials were provided
  * 5. Sends status notifications to connected clients
  * 6. Restarts device if requested
- * 
+ *
  * Status Notification Codes:
  * - "S:WC,NR,IP:<address>" - WiFi connected successfully
  * - "S:WF,NR" - WiFi connection failed
  * - "S:SI,NR" - Server info updated (restart required)
- * 
+ *
  * @param pCharacteristic Pointer to the characteristic being written
  * @param connInfo Connection information structure
  */

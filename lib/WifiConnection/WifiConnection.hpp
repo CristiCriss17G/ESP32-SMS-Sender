@@ -5,18 +5,18 @@
 
 /**
  * @brief Structure to hold WiFi connection information
- * 
+ *
  * Contains connection status and IP address information.
  * Includes automatic cleanup of IP address memory via destructor.
  */
 struct connect_t
 {
-    bool isConnected;       ///< WiFi connection status flag
-    IPAddress *ip;         ///< Pointer to IP address (nullptr if not connected)
-    
+    bool isConnected; ///< WiFi connection status flag
+    IPAddress *ip;    ///< Pointer to IP address (nullptr if not connected)
+
     /**
      * @brief Destructor that cleans up IP address memory
-     * 
+     *
      * Ensures proper deallocation of IPAddress pointer when struct goes out of scope.
      */
     ~connect_t()
@@ -29,11 +29,11 @@ struct connect_t
 
 /**
  * @brief WiFi status manager class
- * 
+ *
  * Manages WiFi connection status information including connection state
  * and IP address. Provides methods for status updates, JSON serialization,
  * and string representation of connection information.
- * 
+ *
  * Features:
  * - Connection status tracking
  * - IP address management with automatic memory cleanup
@@ -113,16 +113,16 @@ public:
     String toString();
 
 private:
-    connect_t connection;    ///< Internal connection information storage
+    connect_t connection; ///< Internal connection information storage
 };
 
 /**
  * @brief WiFi connection management class
- * 
+ *
  * Handles WiFi network connection, disconnection, and status management
  * for ESP32 devices. Integrates with global settings to retrieve
  * network credentials and provides connection status tracking.
- * 
+ *
  * Features:
  * - Automatic WiFi connection with credentials from settings
  * - Connection status monitoring
@@ -130,7 +130,7 @@ private:
  * - Auto-reconnect functionality
  * - Connection timeout handling
  * - Clean disconnection and resource cleanup
- * 
+ *
  * @note Connection attempts are protected against concurrent execution
  */
 class WifiConnection
@@ -167,7 +167,7 @@ public:
     WifiStatus &getStatus();
 
 private:
-    GSettings &settings;           ///< Reference to global settings for WiFi credentials
-    WifiStatus wifiStatus;         ///< WiFi status tracking object
+    GSettings &settings;             ///< Reference to global settings for WiFi credentials
+    WifiStatus wifiStatus;           ///< WiFi status tracking object
     bool isConnectionTrying = false; ///< Flag to prevent concurrent connection attempts
 };
