@@ -210,13 +210,6 @@ void bluetoothChangeStatus()
   }
 }
 
-// Hardware serial for modem
-// HardwareSerial SerialAT(1);
-
-// ===== SMS Configuration =====
-const char *PHONE_NUMBER = "+40725414285";                  ///< Target phone number in international format
-const char *SMS_TEXT = "Salut! Test SMS de pe T-SIM7000G."; ///< SMS message content
-
 /**
  * @brief Power on the GSM modem
  *
@@ -420,7 +413,8 @@ bool checkModemRegistered()
   {
     return modem.waitForNetwork(60000L);
   }
-  return (reg == 1 || reg == 5);
+  Serial.println("Network registered, status: " + String(reg));
+  return true;
 }
 
 /**
