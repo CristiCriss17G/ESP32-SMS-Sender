@@ -154,6 +154,12 @@ lib_deps =
 - `S:WF,NR` - WiFi connection failed
 - `S:SI,NR` - Settings updated (restart required)
 
+### Third-party Control App
+
+I (author of this repository) also maintain a dedicated Tauri-based control application specifically built to configure and manage this board over BLE. The app supports **Windows, macOS, Linux, and Android** and provides a friendly GUI to enter WiFi credentials, view status, and manage device settings.
+
+Project: [ESP32-SMS-Sender-Control-App](https://github.com/CristiCriss17G/ESP32-SMS-Sender-Control-App)
+
 ## 🌐 HTTP API
 
 ### Endpoints
