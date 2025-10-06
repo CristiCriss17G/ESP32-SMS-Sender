@@ -32,58 +32,24 @@
 // Tools -> Core Debug Level: None
 // Monitor at 115200
 
-#define TINY_GSM_MODEM_SIM7000
-#define TINY_GSM_DEBUG Serial   // comment this to reduce logs
-#define TINY_GSM_RX_BUFFER 1024 // Set RX buffer to 1Kb
-
-#define GSM_NL "\r\n"
-
-#define SerialAT Serial1
-// Set serial for debug console (to the Serial Monitor, default speed 115200)
-#define SerialMon Serial
-
-#define DUMP_AT_COMMANDS
-
-// set GSM PIN, if any
-#define GSM_PIN ""
-
-// // Your GPRS credentials, if any
-// const char apn[] = "live.vodafone.com"; // SET TO YOUR APN
-// const char gprsUser[] = "live";
-// const char gprsPass[] = "";
-
-#include <TinyGsmClient.h>
+// #include <Arduino.h>
 #include <Ticker.h>
 #include "GSettings.hpp"
 #include "WifiConnection.hpp"
 #include "BTLe.hpp"
 #include "HTTPServer.hpp"
+#include "Modem.hpp"
 
 #define SECOND 1000l  // 1 second
 #define MINUTE 60000l // 1 minute
-
-#ifdef DUMP_AT_COMMANDS
-#include <StreamDebugger.h>
-StreamDebugger debugger(SerialAT, SerialMon);
-TinyGsm modem(debugger);
-#else
-TinyGsm modem(SerialAT);
-#endif
-
-// ===== Pin definitions (LilyGO T-SIM7000G defaults) =====
-#define MODEM_TX 27       ///< GSM modem UART transmit pin
-#define MODEM_RX 26       ///< GSM modem UART receive pin
-#define MODEM_PWRKEY 4    ///< GSM modem power key control pin
-#define MODEM_POWER_ON 23 ///< GSM modem power enable pin
-#define MODEM_RST 5       ///< GSM modem reset pin
-#define MODEM_DTR 32      ///< GSM modem DTR (Data Terminal Ready) pin
-#define MODEM_RI 33       ///< GSM modem RI (Ring Indicator) pin
 
 #define SD_MISO 2  ///< SD card SPI MISO pin
 #define SD_MOSI 15 ///< SD card SPI MOSI pin
 #define SD_SCLK 14 ///< SD card SPI clock pin
 #define SD_CS 13   ///< SD card SPI chip select pin
 #define LED_PIN 12 ///< Status LED pin
+
+Modem modem; ///< Global modem object
 
 // Global objects
 GSettings settings;                      ///< Global settings manager
@@ -111,6 +77,8 @@ HTTPServer *httpServer;                                         ///< HTTP server
  *
  * The BLE interface allows remote configuration of WiFi credentials and
  * device settings via mobile apps or BLE clients.
+ *
+ * @note BLE remains enabled for configuration even when GSM is used for SMS.
  */
 void bluetoothSetup()
 {
@@ -211,258 +179,6 @@ void bluetoothChangeStatus()
 }
 
 /**
- * @brief Power on the GSM modem
- *
- * Activates the SIM7000G modem by toggling the power key pin.
- * Uses the standard power-on sequence: LOW pulse for 1 second,
- * then HIGH to complete the power-on process.
- */
-void modemPowerOn()
-{
-  pinMode(MODEM_PWRKEY, OUTPUT);
-  digitalWrite(MODEM_PWRKEY, LOW);
-  delay(1000);
-  digitalWrite(MODEM_PWRKEY, HIGH);
-}
-
-/**
- * @brief Power off the GSM modem
- *
- * Safely shuts down the SIM7000G modem by holding the power key
- * LOW for 1.5 seconds, then releasing it to HIGH.
- */
-void modemPowerOff()
-{
-  pinMode(MODEM_PWRKEY, OUTPUT);
-  digitalWrite(MODEM_PWRKEY, LOW);
-  delay(1500);
-  digitalWrite(MODEM_PWRKEY, HIGH);
-}
-
-/**
- * @brief Restart the GSM modem
- *
- * Performs a complete modem restart by powering off, waiting,
- * then powering back on. Useful for recovering from error states.
- */
-void modemRestart()
-{
-  modemPowerOff();
-  delay(1000);
-  modemPowerOn();
-}
-
-bool isCsRegistered() {
-  modem.sendAT("+CREG?");
-  if (modem.waitResponse(2000L, "+CREG:") != 1) return false;
-  String line = modem.stream.readStringUntil('\n'); // " 2,1,"D160","BDA8",0"
-  int c1 = line.indexOf(','), c2 = line.indexOf(',', c1+1);
-  if (c1 < 0) return false;
-  String statStr = (c2 > 0) ? line.substring(c1+1, c2) : line.substring(c1+1);
-  statStr.trim();
-  int stat = statStr.toInt();
-  return (stat == 1 || stat == 5); // 1=home, 5=roaming
-}
-
-/**
- * @brief Initialize and configure the GSM modem for SMS functionality
- *
- * Comprehensive modem initialization process:
- * 1. Configure UART communication (115200 baud)
- * 2. Set DTR pin to keep modem awake
- * 3. Initialize modem communication
- * 4. Display modem information and capabilities
- * 5. Handle SIM card PIN if required
- * 6. Test multiple network modes for best connectivity
- * 7. Wait for network registration and signal quality
- * 8. Display final connection status and network information
- *
- * Network Modes Tested (in order):
- * - Mode 2: Automatic selection
- * - Mode 13: GSM only
- * - Mode 38: LTE only
- * - Mode 51: GSM and LTE only
- *
- * @note LED flashes during network registration attempts
- * @note Will retry modem restart if initial initialization fails
- */
-void initModem()
-{
-  String res;
-
-  SerialAT.begin(115200, SERIAL_8N1, MODEM_RX, MODEM_TX, false);
-  delay(600);
-
-  pinMode(MODEM_DTR, OUTPUT);
-  digitalWrite(MODEM_DTR, LOW); // keep awake
-
-  Serial.println(F("[MODEM] Initializing..."));
-  if (!modem.init())
-  {
-    Serial.println(F("[MODEM] init failed, trying restart()..."));
-    modemRestart();
-    delay(2000);
-    return;
-  }
-
-  Serial.println("========SIMCOMATI======");
-  modem.sendAT("+SIMCOMATI");
-  modem.waitResponse(1000L, res);
-  res.replace(GSM_NL "OK" GSM_NL, "");
-  Serial.println(res);
-  res = "";
-  Serial.println("=======================");
-
-  Serial.println("=====Preferred mode selection=====");
-  modem.sendAT("+CNMP?");
-  if (modem.waitResponse(1000L, res) == 1)
-  {
-    res.replace(GSM_NL "OK" GSM_NL, "");
-    Serial.println(res);
-  }
-  res = "";
-  Serial.println("=======================");
-
-  Serial.println("=====Preferred selection between CAT-M and NB-IoT=====");
-  modem.sendAT("+CMNB?");
-  if (modem.waitResponse(1000L, res) == 1)
-  {
-    res.replace(GSM_NL "OK" GSM_NL, "");
-    Serial.println(res);
-  }
-  res = "";
-  Serial.println("=======================");
-
-  String name = modem.getModemName();
-  Serial.println("Modem Name: " + name);
-
-  String modemInfo = modem.getModemInfo();
-  Serial.println("Modem Info: " + modemInfo);
-
-  // Unlock your SIM card with a PIN if needed
-  if (GSM_PIN && modem.getSimStatus() != 3)
-  {
-    modem.simUnlock(GSM_PIN);
-  }
-
-  // before your for-loop
-  modem.sendAT("+CNMP=13");
-  modem.waitResponse(); // GSM only
-  // modem.sendAT("+CBANDCFG=\"GSM\",\"900,1800\"");
-  modem.waitResponse(); // EU 2G bands
-  modem.sendAT("+CREG=2");
-  modem.waitResponse(); // verbose URCs
-  modem.sendAT("+CGREG=2");
-  modem.waitResponse();
-
-  for (int i = 0; i < 4; i++)
-  {
-    uint8_t network[] = {
-        13, /*GSM only*/
-        51, /*GSM and LTE only*/
-        38, /*LTE only*/
-        2,  /*Automatic*/
-    };
-    Serial.printf("Try %d method\n", network[i]);
-    modem.setNetworkMode(network[i]);
-    delay(3000);
-    bool isConnected = false;
-    int tryCount = 60;
-    while (tryCount--)
-    {
-      int16_t csq = modem.getSignalQuality();
-      Serial.printf("CSQ=%d  ", csq);
-      modem.sendAT("+CREG?");
-      modem.waitResponse();
-      modem.sendAT("+CEREG?");
-      modem.waitResponse();
-      modem.sendAT("+CPIN?");
-      modem.waitResponse();
-      modem.sendAT("+CIMI");
-      modem.waitResponse();
-      // modem.sendAT("+COPS=?");
-      // modem.waitResponse();
-      Serial.print("isNetworkConnected: ");
-      // isConnected = modem.isNetworkConnected();
-      isConnected = isCsRegistered();  // pentru SMS pe Digi
-      Serial.println(isConnected ? "CONNECT" : "NO CONNECT");
-      if (isConnected)
-      {
-        break;
-      }
-      delay(1000);
-      digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-    }
-    if (isConnected)
-    {
-      break;
-    }
-  }
-  digitalWrite(LED_PIN, HIGH);
-
-  Serial.println();
-  Serial.println("Device is connected .");
-  Serial.println();
-
-  Serial.println("=====Inquiring UE system information=====");
-  modem.sendAT("+CPSI?");
-  if (modem.waitResponse(1000L, res) == 1)
-  {
-    res.replace(GSM_NL "OK" GSM_NL, "");
-    Serial.println(res);
-  }
-}
-
-/**
- * @brief Check if the GSM modem is registered on the cellular network
- *
- * Performs network registration verification using AT+CREG? command
- * to ensure the modem is ready for SMS operations.
- *
- * Registration Status Codes:
- * - 1: Registered (home network)
- * - 5: Registered (roaming)
- * - Other values: Not registered
- *
- * If not registered, attempts to wait for network registration
- * for up to 60 seconds as a recovery mechanism.
- *
- * @return true if modem is registered and ready for SMS
- * @return false if modem is not registered on any network
- */
-bool checkModemRegistered()
-{
-  // Ensure modem is registered (cheap quick check)
-  // int reg = -1;
-  // modem.sendAT("+CREG?");
-  // if (modem.waitResponse(2000L, "+CREG:") == 1)
-  // {
-  //   reg = modem.stream.readStringUntil('\n').toInt();
-  // }
-  // // Best effort: if not registered, try wait again (non-fatal)
-  // if (!modem.isNetworkConnected())
-  // {
-  //   return modem.waitForNetwork(60000L);
-  // }
-  // Serial.println("Network registered, status: " + String(reg));
-  return true;
-}
-
-/**
- * @brief Send an SMS message using the GSM modem
- *
- * @param to
- * @param text
- * @return true
- * @return false
- */
-bool sendSMS(const String &to, const String &text)
-{
-  Serial.printf("[SMS] To: %s  Len: %u\n", to.c_str(), (unsigned)text.length());
-  return modem.sendSMS(to.c_str(), text.c_str());
-}
-
-/**
  * @brief Arduino setup function - Initialize all system components
  *
  * Initialization sequence:
@@ -499,7 +215,7 @@ void setup()
 
   Serial.println(F("\n=== T-SIM7000G SMS Sender ==="));
 
-  initModem();
+  modem.initModem();
 
   connect_t result = wifiConnection.connect();
   if (result.isConnected)
@@ -513,7 +229,16 @@ void setup()
     Serial.println("Failed to connect to WiFi!");
   }
 
-  httpServer = new HTTPServer(settings, wifiConnection, sendSMS, checkModemRegistered, 80, LED_PIN);
+  httpServer = new HTTPServer(
+      settings,
+      wifiConnection,
+      // Use lambdas to wrap member functions
+      [&](const String &number, const String &message)
+      { return modem.sendSMS(number, message); },
+      [&]()
+      { return modem.checkModemRegistered(); },
+      80,
+      LED_PIN);
 }
 
 /**
@@ -531,8 +256,8 @@ void setup()
  *
  * @note Uses a minimal 2ms delay to allow ESP32 task scheduler
  *       to handle other system operations efficiently
- * @note SMS sending is now handled via HTTP API requests rather
- *       than continuous automatic sending
+ * @note SMS sending is handled via HTTP API requests rather
+ *       than continuous automatic sending.
  */
 void loop()
 {
