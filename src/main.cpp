@@ -252,6 +252,18 @@ void modemRestart()
   modemPowerOn();
 }
 
+bool isCsRegistered() {
+  modem.sendAT("+CREG?");
+  if (modem.waitResponse(2000L, "+CREG:") != 1) return false;
+  String line = modem.stream.readStringUntil('\n'); // " 2,1,"D160","BDA8",0"
+  int c1 = line.indexOf(','), c2 = line.indexOf(',', c1+1);
+  if (c1 < 0) return false;
+  String statStr = (c2 > 0) ? line.substring(c1+1, c2) : line.substring(c1+1);
+  statStr.trim();
+  int stat = statStr.toInt();
+  return (stat == 1 || stat == 5); // 1=home, 5=roaming
+}
+
 /**
  * @brief Initialize and configure the GSM modem for SMS functionality
  *
@@ -333,13 +345,23 @@ void initModem()
     modem.simUnlock(GSM_PIN);
   }
 
+  // before your for-loop
+  modem.sendAT("+CNMP=13");
+  modem.waitResponse(); // GSM only
+  // modem.sendAT("+CBANDCFG=\"GSM\",\"900,1800\"");
+  modem.waitResponse(); // EU 2G bands
+  modem.sendAT("+CREG=2");
+  modem.waitResponse(); // verbose URCs
+  modem.sendAT("+CGREG=2");
+  modem.waitResponse();
+
   for (int i = 0; i < 4; i++)
   {
     uint8_t network[] = {
-        2,  /*Automatic*/
         13, /*GSM only*/
+        51, /*GSM and LTE only*/
         38, /*LTE only*/
-        51  /*GSM and LTE only*/
+        2,  /*Automatic*/
     };
     Serial.printf("Try %d method\n", network[i]);
     modem.setNetworkMode(network[i]);
@@ -348,12 +370,21 @@ void initModem()
     int tryCount = 60;
     while (tryCount--)
     {
-      int16_t signal = modem.getSignalQuality();
-      Serial.print("Signal: ");
-      Serial.print(signal);
-      Serial.print(" ");
+      int16_t csq = modem.getSignalQuality();
+      Serial.printf("CSQ=%d  ", csq);
+      modem.sendAT("+CREG?");
+      modem.waitResponse();
+      modem.sendAT("+CEREG?");
+      modem.waitResponse();
+      modem.sendAT("+CPIN?");
+      modem.waitResponse();
+      modem.sendAT("+CIMI");
+      modem.waitResponse();
+      // modem.sendAT("+COPS=?");
+      // modem.waitResponse();
       Serial.print("isNetworkConnected: ");
-      isConnected = modem.isNetworkConnected();
+      // isConnected = modem.isNetworkConnected();
+      isConnected = isCsRegistered();  // pentru SMS pe Digi
       Serial.println(isConnected ? "CONNECT" : "NO CONNECT");
       if (isConnected)
       {
@@ -402,18 +433,18 @@ void initModem()
 bool checkModemRegistered()
 {
   // Ensure modem is registered (cheap quick check)
-  int reg = -1;
-  modem.sendAT("+CREG?");
-  if (modem.waitResponse(2000L, "+CREG:") == 1)
-  {
-    reg = modem.stream.readStringUntil('\n').toInt();
-  }
-  // Best effort: if not registered, try wait again (non-fatal)
-  if (!modem.isNetworkConnected())
-  {
-    return modem.waitForNetwork(60000L);
-  }
-  Serial.println("Network registered, status: " + String(reg));
+  // int reg = -1;
+  // modem.sendAT("+CREG?");
+  // if (modem.waitResponse(2000L, "+CREG:") == 1)
+  // {
+  //   reg = modem.stream.readStringUntil('\n').toInt();
+  // }
+  // // Best effort: if not registered, try wait again (non-fatal)
+  // if (!modem.isNetworkConnected())
+  // {
+  //   return modem.waitForNetwork(60000L);
+  // }
+  // Serial.println("Network registered, status: " + String(reg));
   return true;
 }
 
