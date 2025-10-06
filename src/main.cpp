@@ -47,10 +47,10 @@
 // set GSM PIN, if any
 #define GSM_PIN ""
 
-// Your GPRS credentials, if any
-const char apn[] = "live.vodafone.com"; // SET TO YOUR APN
-const char gprsUser[] = "live";
-const char gprsPass[] = "";
+// // Your GPRS credentials, if any
+// const char apn[] = "live.vodafone.com"; // SET TO YOUR APN
+// const char gprsUser[] = "live";
+// const char gprsPass[] = "";
 
 #include <TinyGsmClient.h>
 #include <Ticker.h>
