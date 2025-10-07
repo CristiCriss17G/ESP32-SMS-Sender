@@ -234,9 +234,9 @@ void setup()
       wifiConnection,
       // Use lambdas to wrap member functions
       [&](const String &number, const String &message)
-      { return modem.sendSMS(number, message); },
+      { return modem.sendSmsSafe(number, message); },
       [&]()
-      { return modem.checkModemRegistered(); },
+      { return modem.isCsRegistered(); },
       80,
       LED_PIN);
 }

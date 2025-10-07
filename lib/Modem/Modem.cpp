@@ -1,5 +1,7 @@
 #include "Modem.hpp"
 
+const CarrierProfile *DEFAULT_PROFILE = nullptr; // if unknown operator
+
 #ifdef DUMP_AT_COMMANDS
 StreamDebugger debugger(SerialAT, SerialMon);
 Modem::Modem() : modem(debugger)
@@ -154,6 +156,156 @@ void Modem::initModem()
     }
 }
 
+void Modem::initModemClean()
+{
+    String res;
+
+    SerialAT.begin(115200, SERIAL_8N1, MODEM_RX, MODEM_TX, false);
+    delay(600);
+
+    Serial.println(F("[MODEM] Initializing..."));
+    if (!modem.init())
+    {
+        Serial.println(F("[MODEM] init failed, restarting modem..."));
+        modem.restart();
+    }
+
+    String name = modem.getModemName();
+    Serial.println("[MODEM] Modem Name: " + name);
+
+    String modemInfo = modem.getModemInfo();
+    Serial.println("[MODEM] Modem Info: " + modemInfo);
+
+    // Unlock your SIM card with a PIN if needed
+    if (GSM_PIN && modem.getSimStatus() != 3)
+    {
+        modem.simUnlock(GSM_PIN);
+    }
+
+    String imsi = readIMSI();
+    String mccmnc = mccmncFromIMSI(imsi);
+    const CarrierProfile *prof = selectProfile(mccmnc);
+    Serial.printf("[SIM] IMSI=%s  MCCMNC=%s  Profile=%s\n",
+                  imsi.c_str(), mccmnc.c_str(), prof ? prof->name : "default");
+
+    // NOTE: don't spam CBANDCFG; many firmwares disallow it
+    // Keep DTR low to avoid sleep
+    pinMode(MODEM_DTR, OUTPUT);
+    digitalWrite(MODEM_DTR, LOW);
+
+    modem.sendAT("+CNMP?");
+    if (modem.waitResponse(1000L, res) == 1)
+    {
+        res.replace(GSM_NL "OK" GSM_NL, "");
+        Serial.println("[MODEM][CNMP] Mode=" + res);
+    }
+
+    if (!setupRadioWithProfile(prof))
+    {
+        Serial.println("[MODEM] No CS registration with preferred modes, last resort AUTO...");
+        modem.sendAT("+CNMP=2");
+        modem.waitResponse();
+        waitCsRegistered(30000);
+    }
+
+    if (!isCsRegistered())
+    {
+        Serial.println("[MODEM] Still not CS registered — SMS will fail here.");
+    }
+    else
+    {
+        Serial.println("[MODEM] CS registered — SMS ready.");
+    }
+}
+
+String Modem::readIMSI()
+{
+    modem.sendAT("+CIMI");
+    if (modem.waitResponse(2000L, "+CIMI") == 1)
+    {
+        // ditch echo line
+        modem.stream.readStringUntil('\n');
+    }
+    String imsi = modem.stream.readStringUntil('\n');
+    imsi.trim();
+    return imsi; // e.g. "22605xxxxxxxxx"
+}
+
+String Modem::mccmncFromIMSI(const String &imsi)
+{
+    if (imsi.length() < 5)
+        return "";
+    return imsi.substring(0, 5); // MCC(3)+MNC(2)
+}
+
+const CarrierProfile *Modem::selectProfile(const String &mccmnc)
+{
+    for (auto &p : PROFILES)
+    {
+        if (mccmnc == p.mccmnc)
+            return &p;
+    }
+    return DEFAULT_PROFILE;
+}
+
+bool Modem::setupRadioWithProfile(const CarrierProfile *prof)
+{
+    String res;
+    // URCs only; keep logs quiet
+    modem.sendAT("+CREG=2");
+    modem.waitResponse();
+    modem.sendAT("+CGREG=2");
+    modem.waitResponse();
+
+    // Optional: operator lock (reduces re-scan)
+    if (prof && prof->plmn && prof->act >= 0)
+    {
+        modem.sendAT("+COPS=1,2,\"" + String(prof->plmn) + "\"," + String(prof->act));
+        modem.waitResponse();
+    }
+    else
+    {
+        modem.sendAT("+COPS=0");
+        modem.waitResponse(); // automatic
+    }
+
+    // Try preferred modes in order
+    for (int i = 0; i < 4; ++i)
+    {
+        uint8_t mode = prof ? prof->modes[i] : 2; // default auto
+        if (mode == 0)
+            continue;
+
+        // Set mode
+        modem.setNetworkMode(mode);
+
+        modem.sendAT("+CMNB?");
+        if (modem.waitResponse(1000L, res) == 1)
+        {
+            res.replace(GSM_NL "OK" GSM_NL, "");
+            Serial.println("Preferred CMNB mode: " + res);
+        }
+        res = "";
+        // Set LTE-M/NB preference only if we're in LTE family mode
+        if (prof && prof->cmnb >= 0 && (mode == 38 || mode == 51))
+        {
+            modem.sendAT("+CMNB=" + String(prof->cmnb));
+            modem.waitResponse();
+        }
+
+        // Give RF a moment
+        delay(1500);
+
+        Serial.printf("[RADIO] Trying mode %u ...\n", mode);
+        if (waitCsRegistered(30000))
+        {
+            Serial.println("[RADIO] CS registered.");
+            return true;
+        }
+    }
+    return false;
+}
+
 /**
  * @brief Check Circuit-Switched (CS) registration using AT+CREG?
  *
@@ -173,6 +325,18 @@ bool Modem::isCsRegistered()
     statStr.trim();
     int stat = statStr.toInt();
     return (stat == 1 || stat == 5); // 1=home, 5=roaming
+}
+
+bool Modem::waitCsRegistered(uint32_t ms)
+{
+    uint32_t deadline = millis() + ms;
+    while (millis() < deadline)
+    {
+        if (isCsRegistered())
+            return true;
+        delay(500);
+    }
+    return false;
 }
 
 /**
@@ -215,6 +379,31 @@ bool Modem::sendSMS(const String &to, const String &text)
 {
     Serial.printf("[SMS] To: %s  Len: %u\n", to.c_str(), (unsigned)text.length());
     return modem.sendSMS(to.c_str(), text.c_str());
+}
+
+bool Modem::sendSmsSafe(const String &to, const String &text)
+{
+    if (text.length() < 1 || text.length() > 160)
+        return false;
+    if (!(to.startsWith("+") && to.substring(1).length() >= 7))
+        return false;
+
+    modemBusy = true;
+
+    if (!waitCsRegistered(15000))
+    {
+        modemBusy = false;
+        Serial.println("[SMS] Not CS-registered; abort.");
+        return false;
+    }
+
+    modem.sendAT("+CMGF=1");
+    modem.waitResponse();
+    Serial.printf("[SMS] To: %s  Len: %u\n", to.c_str(), (unsigned)text.length());
+    bool ok = modem.sendSMS(to.c_str(), text.c_str());
+
+    modemBusy = false;
+    return ok;
 }
 
 /**

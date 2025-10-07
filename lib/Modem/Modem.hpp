@@ -32,6 +32,52 @@
 
 #define LED_PIN 12 ///< Status LED pin
 
+struct CarrierProfile
+{
+    const char *name;
+    const char *mccmnc; // e.g. "22601" (Vodafone), "22605" (Digi), "22610" (Orange)
+    // Preferred order to try:
+    // 13 = GSM only, 38 = LTE (Cat-M/NB1 only), 51 = GSM + LTE-M/NB1, 2 = Auto
+    uint8_t modes[4];
+    // LTE-M/NB-IoT preference (only used when trying LTE mode 38 or 51)
+    // CMNB=0 (CAT-M preferred), 1 (NB1 preferred), 2 (CAT-M only), 3 (NB1 only)
+    int cmnb; // -1 = don't touch
+    // Optional operator lock: use PLMN "226xx" + act
+    const char *plmn; // e.g. "22605" for Digi
+    int act;          // 0=GSM, 8=CAT-M, 9=NB-IoT, -1=unspecified
+    // Data config (only if/when you need data)
+    const char *apn; // leave "" if not needed / unknown
+    const char *user;
+    const char *pass;
+};
+
+static const CarrierProfile PROFILES[] = {
+    // Vodafone RO (22601) — typically LTE-M available; SMS OK everywhere
+    {
+        "Vodafone RO", "22601",
+        /*modes*/ {38, 51, 13, 2}, /*prefer LTE-M/NB first, fallback GSM*/
+        /*cmnb*/ 0,                /*CAT-M preferred*/
+        /*lock*/ "22601", 8,       /*optional: lock CAT-M (8)*/
+        /*APN*/ "", "", ""         /*fill your APN if you need data*/
+    },
+
+    // Digi RO (22605) — practical for SIM7000G only on GSM
+    {
+        "Digi RO", "22605",
+        /*modes*/ {13, 2, 38, 51}, /*prefer GSM first*/
+        /*cmnb*/ -1,
+        /*lock*/ "22605", 0,       /*optional: lock GSM*/
+        /*APN*/ "internet", "", "" /*common generic APN; change if required*/
+    },
+
+    // Orange RO (22610) — LTE-M/NB often available
+    {"Orange RO", "22610",
+     /*modes*/ {38, 51, 13, 2},
+     /*cmnb*/ 0,
+     /*lock*/ "22610", 8,
+     /*APN*/ "", "", ""},
+};
+
 /**
  * @class Modem
  * @brief High-level wrapper around TinyGSM for SIM7000-based SMS and registration management.
@@ -77,6 +123,16 @@ public:
      */
     void initModem();
 
+    void initModemClean();
+
+    String readIMSI();
+
+    String mccmncFromIMSI(const String &imsi);
+
+    const CarrierProfile *selectProfile(const String &mccmnc);
+
+    bool setupRadioWithProfile(const CarrierProfile *prof);
+
     /**
      * @brief Check Circuit-Switched (CS) registration using AT+CREG?
      *
@@ -84,6 +140,8 @@ public:
      * Does not wait or retry; quick check only.
      */
     bool isCsRegistered();
+
+    bool waitCsRegistered(uint32_t ms = 30000);
 
     /**
      * @brief Check if the GSM modem is registered on the cellular network
@@ -116,6 +174,8 @@ public:
      * @retval false Sending failed (e.g., not registered, invalid number, or modem error)
      */
     bool sendSMS(const String &to, const String &text);
+
+    bool sendSmsSafe(const String &to, const String &text);
 
     /**
      * @brief Power on the GSM modem
@@ -150,4 +210,5 @@ public:
 
 private:
     TinyGsm modem;
+    volatile bool modemBusy = false;
 };
