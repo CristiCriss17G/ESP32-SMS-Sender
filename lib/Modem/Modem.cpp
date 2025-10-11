@@ -99,7 +99,7 @@ void Modem::initModem()
     modem.sendAT("+CNMP=13");
     modem.waitResponse(); // GSM only
     // modem.sendAT("+CBANDCFG=\"GSM\",\"900,1800\"");
-    modem.waitResponse(); // EU 2G bands
+    // modem.waitResponse(); // EU 2G bands
     modem.sendAT("+CREG=2");
     modem.waitResponse(); // verbose URCs
     modem.sendAT("+CGREG=2");
