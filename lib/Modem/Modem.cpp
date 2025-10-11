@@ -134,7 +134,7 @@ void Modem::initModem()
             // modem.waitResponse();
             Serial.print("isNetworkConnected: ");
             // isConnected = modem.isNetworkConnected();
-            isConnected = isCsRegistered(); // pentru SMS pe Digi
+            isConnected = isCsRegistered(); // for SMS on Digi
             Serial.println(isConnected ? "CONNECT" : "NO CONNECT");
             if (isConnected)
             {
