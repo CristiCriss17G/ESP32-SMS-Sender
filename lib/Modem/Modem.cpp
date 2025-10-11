@@ -1,5 +1,12 @@
 #include "Modem.hpp"
 
+/**
+ * @brief Default carrier profile used when operator is unknown or unsupported
+ *
+ * Fallback profile pointer used by selectProfile() when no matching carrier
+ * configuration is found in the PROFILES array. Currently set to nullptr
+ * to indicate unknown operator, causing initModem() to use generic settings.
+ */
 const CarrierProfile *DEFAULT_PROFILE = nullptr; // if unknown operator
 
 #ifdef DUMP_AT_COMMANDS
@@ -156,6 +163,13 @@ void Modem::initModem()
     }
 }
 
+/**
+ * @brief Clean initialization of the GSM modem without carrier-specific configurations
+ *
+ * Simplified initialization path that performs basic modem setup without
+ * attempting carrier-specific optimizations. Useful for debugging or when
+ * carrier profiles are causing connection issues.
+ */
 void Modem::initModemClean()
 {
     String res;
@@ -220,6 +234,12 @@ void Modem::initModemClean()
     }
 }
 
+/**
+ * @brief Read IMSI from SIM card using AT+CIMI command
+ *
+ * Sends the AT+CIMI command to retrieve the International Mobile Subscriber Identity
+ * from the SIM card. This 15-digit number contains carrier identification information.
+ */
 String Modem::readIMSI()
 {
     modem.sendAT("+CIMI");
@@ -233,6 +253,12 @@ String Modem::readIMSI()
     return imsi; // e.g. "22605xxxxxxxxx"
 }
 
+/**
+ * @brief Extract MCC+MNC from IMSI string for carrier identification
+ *
+ * Parses the first 5 digits of the IMSI to get Mobile Country Code (3 digits)
+ * and Mobile Network Code (2 digits) used for carrier profile selection.
+ */
 String Modem::mccmncFromIMSI(const String &imsi)
 {
     if (imsi.length() < 5)
@@ -240,6 +266,12 @@ String Modem::mccmncFromIMSI(const String &imsi)
     return imsi.substring(0, 5); // MCC(3)+MNC(2)
 }
 
+/**
+ * @brief Select carrier-specific configuration profile based on MCCMNC
+ *
+ * Looks up the appropriate CarrierProfile for the given MCCMNC combination.
+ * Searches through the PROFILES array for a matching carrier configuration.
+ */
 const CarrierProfile *Modem::selectProfile(const String &mccmnc)
 {
     for (auto &p : PROFILES)
@@ -250,6 +282,12 @@ const CarrierProfile *Modem::selectProfile(const String &mccmnc)
     return DEFAULT_PROFILE;
 }
 
+/**
+ * @brief Configure radio parameters using carrier-specific profile
+ *
+ * Applies carrier-optimized settings including network modes, RAT selection,
+ * and operator preferences to improve connection reliability and speed.
+ */
 bool Modem::setupRadioWithProfile(const CarrierProfile *prof)
 {
     String res;
@@ -329,6 +367,12 @@ bool Modem::isCsRegistered()
     return (stat == 1 || stat == 5); // 1=home, 5=roaming
 }
 
+/**
+ * @brief Wait for Circuit-Switched registration with polling and timeout
+ *
+ * Continuously polls modem registration status until successful registration
+ * or timeout expires. Uses isCsRegistered() internally for status checks.
+ */
 bool Modem::waitCsRegistered(uint32_t ms)
 {
     uint32_t deadline = millis() + ms;
@@ -383,6 +427,12 @@ bool Modem::sendSMS(const String &to, const String &text)
     return modem.sendSMS(to.c_str(), text.c_str());
 }
 
+/**
+ * @brief Send SMS with additional safety checks and error recovery
+ *
+ * Enhanced SMS sending with validation, registration checks, and retry logic.
+ * Includes phone number validation, length checks, and modem status verification.
+ */
 bool Modem::sendSmsSafe(const String &to, const String &text)
 {
     if (text.length() < 1 || text.length() > 160)

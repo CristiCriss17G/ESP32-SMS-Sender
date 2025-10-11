@@ -32,25 +32,106 @@
 
 #define LED_PIN 12 ///< Status LED pin
 
+/**
+ * @struct CarrierProfile
+ * @brief Carrier-specific configuration profile for optimal modem settings
+ *
+ * Contains operator-specific parameters for network registration optimization.
+ * Each profile includes preferred network modes, radio access technologies,
+ * and optional operator locking to improve connection reliability and speed.
+ *
+ * Network Mode Values:
+ * - 2: Automatic mode selection
+ * - 13: GSM only (2G)
+ * - 38: LTE only (Cat-M/NB-IoT)
+ * - 51: GSM + LTE (Cat-M/NB-IoT)
+ *
+ * CMNB Values (LTE preference):
+ * - 0: Cat-M preferred
+ * - 1: NB-IoT preferred
+ * - 2: Cat-M only
+ * - 3: NB-IoT only
+ * - -1: Don't modify CMNB setting
+ *
+ * ACT Values (Access Technology):
+ * - 0: GSM
+ * - 8: Cat-M (LTE-M)
+ * - 9: NB-IoT
+ * - -1: Unspecified/automatic
+ */
 struct CarrierProfile
 {
-    const char *name;
-    const char *mccmnc; // e.g. "22601" (Vodafone), "22605" (Digi), "22610" (Orange)
-    // Preferred order to try:
-    // 13 = GSM only, 38 = LTE (Cat-M/NB1 only), 51 = GSM + LTE-M/NB1, 2 = Auto
+    const char *name;   ///< Human-readable carrier name for identification
+    const char *mccmnc; ///< Mobile Country Code + Mobile Network Code (e.g., "22601" for Vodafone Romania)
+
+    /**
+     * @brief Preferred network modes to try in order of priority
+     *
+     * Array of 4 network mode values to attempt sequentially:
+     * - 13: GSM only (2G) - Most compatible, lowest data rates
+     * - 38: LTE only (Cat-M/NB-IoT) - Modern IoT protocols
+     * - 51: GSM + LTE (Cat-M/NB-IoT) - Hybrid mode
+     * - 2: Automatic mode selection - Let modem decide
+     */
     uint8_t modes[4];
-    // LTE-M/NB-IoT preference (only used when trying LTE mode 38 or 51)
-    // CMNB=0 (CAT-M preferred), 1 (NB1 preferred), 2 (CAT-M only), 3 (NB1 only)
-    int cmnb; // -1 = don't touch
-    // Optional operator lock: use PLMN "226xx" + act
-    const char *plmn; // e.g. "22605" for Digi
-    int act;          // 0=GSM, 8=CAT-M, 9=NB-IoT, -1=unspecified
-    // Data config (only if/when you need data)
-    const char *apn; // leave "" if not needed / unknown
-    const char *user;
-    const char *pass;
+
+    /**
+     * @brief LTE-M/NB-IoT preference setting for CMNB command
+     *
+     * Controls LTE technology preference when using modes 38 or 51:
+     * - 0: Cat-M preferred over NB-IoT
+     * - 1: NB-IoT preferred over Cat-M
+     * - 2: Cat-M only (disable NB-IoT)
+     * - 3: NB-IoT only (disable Cat-M)
+     * - -1: Don't modify CMNB setting (use modem defaults)
+     */
+    int cmnb;
+
+    /**
+     * @brief Public Land Mobile Network identifier for operator locking
+     *
+     * Optional PLMN string for manual operator selection (e.g., "22605" for Digi).
+     * Used with COPS command to force registration to specific operator.
+     * Set to nullptr to disable operator locking.
+     */
+    const char *plmn;
+
+    /**
+     * @brief Access Technology for operator locking
+     *
+     * Specifies radio access technology when using PLMN locking:
+     * - 0: GSM (2G)
+     * - 8: Cat-M (LTE-M)
+     * - 9: NB-IoT
+     * - -1: Unspecified (let operator choose)
+     */
+    int act;
+
+    /**
+     * @brief Access Point Name for data connections
+     *
+     * APN string for packet data contexts. Used only if data connectivity
+     * is required in addition to SMS. Set to empty string if not needed.
+     */
+    const char *apn;
+
+    const char *user; ///< Username for APN authentication (usually empty for SMS-only)
+    const char *pass; ///< Password for APN authentication (usually empty for SMS-only)
 };
 
+/**
+ * @brief Array of predefined carrier profiles for Romanian mobile operators
+ *
+ * Contains optimized configurations for major Romanian carriers including
+ * Vodafone, Digi, and Orange. Each profile specifies preferred network modes,
+ * LTE technology preferences, and optional operator locking parameters.
+ *
+ * Profiles are ordered by popularity and coverage. The selectProfile() function
+ * searches this array to find the best configuration for a detected carrier.
+ *
+ * @note Add new carrier profiles here as needed for other operators
+ * @note Profiles are region-specific (Romania - MCC 226)
+ */
 static const CarrierProfile PROFILES[] = {
     // Vodafone RO (22601) — typically LTE-M available; SMS OK everywhere
     {
@@ -123,14 +204,80 @@ public:
      */
     void initModem();
 
+    /**
+     * @brief Clean initialization of the GSM modem without carrier-specific configurations
+     *
+     * Performs a simplified modem initialization sequence:
+     * - Basic UART setup and modem wake-up
+     * - Standard AT command initialization
+     * - Generic network registration without carrier profiles
+     * - Minimal configuration for basic SMS functionality
+     *
+     * This method is used when carrier-specific optimizations are not needed
+     * or when the automatic carrier detection fails.
+     *
+     * @note Less comprehensive than initModem() but more reliable across carriers
+     */
     void initModemClean();
 
+    /**
+     * @brief Read the International Mobile Subscriber Identity (IMSI) from the SIM card
+     *
+     * Retrieves the IMSI using the AT+CIMI command. The IMSI is a unique identifier
+     * stored on the SIM card that contains the Mobile Country Code (MCC) and
+     * Mobile Network Code (MNC) used for carrier identification.
+     *
+     * IMSI Format: MCCMNC + subscriber number (typically 15 digits)
+     * Example: "226010123456789" (MCC=226, MNC=01 for T-Mobile Romania)
+     *
+     * @return String containing the IMSI, or empty string if read failed
+     * @note Requires SIM card to be inserted and unlocked
+     */
     String readIMSI();
 
+    /**
+     * @brief Extract Mobile Country Code and Mobile Network Code from IMSI
+     *
+     * Parses the IMSI string to extract the MCC (first 3 digits) and MNC
+     * (next 2-3 digits) which together identify the mobile network operator.
+     * This information is used for carrier-specific configuration selection.
+     *
+     * @param imsi The IMSI string obtained from readIMSI()
+     * @return String containing MCCMNC (e.g., "22601" for T-Mobile Romania)
+     * @retval Empty string if IMSI format is invalid or too short
+     */
     String mccmncFromIMSI(const String &imsi);
 
+    /**
+     * @brief Select carrier-specific configuration profile based on MCCMNC
+     *
+     * Looks up the appropriate CarrierProfile for the given MCCMNC combination.
+     * Carrier profiles contain optimized settings for network registration,
+     * preferred radio access technologies, and other operator-specific parameters.
+     *
+     * @param mccmnc Mobile Country Code + Mobile Network Code string
+     * @return Pointer to CarrierProfile if found, DEFAULT_PROFILE if unknown carrier
+     * @note Returns nullptr or DEFAULT_PROFILE for unsupported carriers
+     */
     const CarrierProfile *selectProfile(const String &mccmnc);
 
+    /**
+     * @brief Configure radio parameters using carrier-specific profile
+     *
+     * Applies carrier-optimized settings including:
+     * - Preferred network modes (2G/3G/4G priority)
+     * - Radio Access Technology (RAT) selection
+     * - Band preferences and network operator settings
+     * - Registration timeouts and retry parameters
+     *
+     * This method optimizes the modem configuration for the detected carrier
+     * to improve connection reliability and speed.
+     *
+     * @param prof Pointer to CarrierProfile containing optimization parameters
+     * @retval true Configuration applied successfully
+     * @retval false Configuration failed or profile was invalid
+     * @note May take several seconds to apply all settings
+     */
     bool setupRadioWithProfile(const CarrierProfile *prof);
 
     /**
@@ -141,6 +288,23 @@ public:
      */
     bool isCsRegistered();
 
+    /**
+     * @brief Wait for Circuit-Switched registration with timeout
+     *
+     * Continuously polls the modem registration status using AT+CREG? until
+     * either successful registration is achieved or the timeout expires.
+     * This is useful when the modem needs time to complete network registration.
+     *
+     * Registration Status:
+     * - 1: Registered (home network) - SUCCESS
+     * - 5: Registered (roaming) - SUCCESS
+     * - Other values: Not registered - CONTINUE WAITING
+     *
+     * @param ms Timeout in milliseconds (default: 30000ms = 30 seconds)
+     * @retval true Registration successful within timeout period
+     * @retval false Timeout expired without successful registration
+     * @note Blocking function that polls every few seconds until timeout
+     */
     bool waitCsRegistered(uint32_t ms = 30000);
 
     /**
@@ -175,6 +339,29 @@ public:
      */
     bool sendSMS(const String &to, const String &text);
 
+    /**
+     * @brief Send SMS with additional safety checks and error recovery
+     *
+     * Enhanced SMS sending function that includes additional validation and
+     * recovery mechanisms compared to the basic sendSMS() method:
+     * - Pre-flight validation of modem registration status
+     * - Phone number format validation and normalization
+     * - Message length checks and segmentation warnings
+     * - Automatic retry on temporary failures
+     * - Detailed error logging for troubleshooting
+     *
+     * Safety Features:
+     * - Validates network registration before attempting send
+     * - Implements retry logic for temporary network issues
+     * - Provides more detailed error reporting
+     * - Handles edge cases in phone number formatting
+     *
+     * @param to Destination phone number (E.164 format recommended)
+     * @param text Message content (will be segmented if >160 characters)
+     * @retval true Message sent successfully or queued for delivery
+     * @retval false Send failed after all retry attempts or invalid parameters
+     * @note Slightly slower than sendSMS() due to additional checks
+     */
     bool sendSmsSafe(const String &to, const String &text);
 
     /**
