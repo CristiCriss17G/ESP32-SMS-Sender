@@ -222,7 +222,7 @@ void setup()
   {
     Serial.println("Connected to WiFi!");
     Serial.print("IP Address: ");
-    Serial.println(*result.ip);
+    Serial.println(result.ip);
   }
   else
   {

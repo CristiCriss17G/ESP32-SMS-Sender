@@ -2,6 +2,7 @@
 
 #include <Preferences.h>
 #include <ArduinoJson.h>
+#include "ProbeRegistry.hpp"
 
 /**
  * @brief Global settings manager class

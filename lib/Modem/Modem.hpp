@@ -1,4 +1,5 @@
 #pragma once
+#include "ProbeRegistry.hpp"
 
 #define TINY_GSM_MODEM_SIM7000
 #define TINY_GSM_DEBUG Serial   // comment this to reduce logs

@@ -2,6 +2,7 @@
 
 #include <WiFi.h>
 #include "GSettings.hpp"
+#include "ProbeRegistry.hpp"
 
 /**
  * @brief Structure to hold WiFi connection information
@@ -12,19 +13,21 @@
 struct connect_t
 {
     bool isConnected; ///< WiFi connection status flag
-    IPAddress *ip;    ///< Pointer to IP address (nullptr if not connected)
+    IPAddress ip;     ///< IP address (default constructed if not connected)
 
     /**
-     * @brief Destructor that cleans up IP address memory
+     * @brief Check if the IP address is null (unassigned)
      *
-     * Ensures proper deallocation of IPAddress pointer when struct goes out of scope.
+     * @return true if IP address is null
+     * @return false if IP address is assigned
      */
-    ~connect_t()
+    bool isIPNULL() const
     {
-        if (ip != nullptr)
-            delete ip;
-        ip = nullptr;
+        return ip == NULL_IP;
     }
+
+private:
+    static IPAddress NULL_IP;
 };
 
 /**

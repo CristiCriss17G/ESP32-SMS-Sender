@@ -16,6 +16,7 @@
 #include <ArduinoJson.h>
 #include "GSettings.hpp"
 #include "WifiConnection.hpp"
+#include "ProbeRegistry.hpp"
 
 // BLE Configuration Parameters
 #define BLE_DEVICE_NAME "ESP32-BLE-Example"                         ///< Default BLE device name for advertising

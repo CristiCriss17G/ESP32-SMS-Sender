@@ -11,7 +11,12 @@
  * Initializes all settings with sensible defaults. The device name
  * defaults to "ESP32-BLE-Example", while WiFi credentials start empty.
  */
-GSettings::GSettings() : deviceName("ESP32-BLE-Example"), ssid(""), password("") {}
+GSettings::GSettings() : deviceName("ESP32-BLE-Example"), ssid(""), password("")
+{
+    ProbeRegistry::instance().registerProbe("settings", [this](JsonObject &dst)
+                                            {
+                                                this->toJson(dst); });
+}
 
 /**
  * @brief Get the current device name

@@ -16,6 +16,11 @@ Modem::Modem() : modem(debugger)
 Modem::Modem() : modem(SerialAT)
 #endif
 {
+    ProbeRegistry::instance().registerProbe("modem", [this](JsonObject &dst)
+                                            {
+        dst["registered"] = isCsRegistered();
+        dst["rssi"]       = modem.getSignalQuality();
+        dst["mode"]       = modem.getNetworkMode(); });
 }
 
 Modem::~Modem()

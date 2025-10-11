@@ -116,13 +116,8 @@ void CharacteristicCallbacks::onRead(NimBLECharacteristic *pCharacteristic, NimB
 {
     Serial.println("Read request received");
     // Allocate the JSON document
-    JsonDocument doc;
-    JsonObject wifiS = doc["wifiStatus"].to<JsonObject>();
-    wifiConnection.getStatus().toJson(wifiS);
-    JsonObject settingsS = doc["settings"].to<JsonObject>();
-    settings.toJson(settingsS);
-    String output;
-    serializeJson(doc, output);
+    String output = ProbeRegistry::instance().collectAllAsJson();
+    Serial.println("Sending response: " + output);
     pCharacteristic->setValue(output.c_str());
 }
 
@@ -204,7 +199,7 @@ void CharacteristicCallbacks::onWrite(NimBLECharacteristic *pCharacteristic, Nim
             {
                 Serial.println("Connected to WiFi!");
                 wifiConnection.getStatus().setWifiConnected(true);
-                wifiConnection.getStatus().setIpAddress(*result.ip);
+                wifiConnection.getStatus().setIpAddress(result.ip);
                 if (notifyCharacteristic != nullptr)
                 {
                     notifyCharacteristic->notify("S:WC,NR,IP:" + wifiConnection.getStatus().getIpAddress());
