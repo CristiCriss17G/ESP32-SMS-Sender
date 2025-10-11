@@ -160,6 +160,8 @@ void Modem::initModemClean()
 {
     String res;
 
+    modemPowerOn();
+
     SerialAT.begin(115200, SERIAL_8N1, MODEM_RX, MODEM_TX, false);
     delay(600);
 

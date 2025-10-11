@@ -215,7 +215,7 @@ void setup()
 
   Serial.println(F("\n=== T-SIM7000G SMS Sender ==="));
 
-  modem.initModem();
+  modem.initModemClean();
 
   connect_t result = wifiConnection.connect();
   if (result.isConnected)
