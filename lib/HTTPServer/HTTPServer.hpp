@@ -13,7 +13,7 @@
  * @return true if SMS was sent successfully
  * @return false if SMS sending failed
  */
-typedef bool (*SMSFunction)(const String &to, const String &text);
+using SMSFunction = std::function<bool(const String &to, const String &text)>;
 
 /**
  * @brief Function pointer type for checking modem network registration
@@ -21,14 +21,14 @@ typedef bool (*SMSFunction)(const String &to, const String &text);
  * @return true if modem is registered and ready to send SMS
  * @return false if modem is not registered on the network
  */
-typedef bool (*CheckModemRegisteredFunction)();
+using CheckModemRegisteredFunction = std::function<bool()>;
 
 /**
  * @brief HTTP Server class for ESP32 SMS Sender application
  *
  * This class provides a web server interface for sending SMS messages.
- * It serves an HTML form interface and provides a REST API endpoint
- * for sending SMS messages through a connected GSM modem.
+ * It serves an HTML form interface and a REST API endpoint for sending
+ * SMS through the connected GSM modem.
  *
  * Features:
  * - Web interface with HTML form for SMS sending
@@ -36,6 +36,19 @@ typedef bool (*CheckModemRegisteredFunction)();
  * - CORS support for cross-origin requests
  * - Phone number format validation
  * - Modem registration status checking
+ *
+ * REST API
+ * - Endpoint: POST /send
+ * - Request headers: Content-Type: application/json
+ * - Request body (JSON):
+ *   {
+ *     "to": "+40123456789",   // E.164 or local format
+ *     "text": "Hello world"   // message body, UTF-8/GSM-7
+ *   }
+ * - Response (application/json):
+ *   Success: { "ok": true }
+ *   Failure: { "ok": false, "error": "reason" }
+ * - Error cases: invalid JSON, missing fields, bad phone format, modem not registered
  *
  * @note Requires a GSM modem with SMS capability and valid network registration
  */
@@ -97,10 +110,20 @@ private:
     /**
      * @brief Handle SMS sending endpoint (POST /send)
      *
-     * Processes incoming SMS requests from JSON payload.
-     * Validates phone number format and message length,
-     * checks modem registration, and sends SMS using the provided function pointer.
-     * Returns JSON response with success/error status.
+     * Input JSON fields:
+     * - to (string, required): phone number in E.164 or local format
+     * - text (string, required): message body (160 GSM-7 chars typical per SMS)
+     *
+     * Behavior:
+     * - Validates JSON and fields
+     * - Validates phone number format via looksLikePhone
+     * - Checks modem registration via checkModemRegistered
+     * - Calls sendSMS on success path
+     *
+     * Responses:
+     * - 200, {"ok": true} on success
+     * - 400, {"ok": false, "error": "..."} for bad input
+     * - 503, {"ok": false, "error": "modem not registered"} when offline
      */
     void handleSend();
 
@@ -124,11 +147,12 @@ private:
      * @brief Validate if a string looks like a phone number
      *
      * Performs basic validation to check if the input string resembles
-     * a phone number format (contains only digits and plus sign, proper length).
+     * a phone number format (contains only digits and optional leading '+').
+     * Typical accepted lengths are 8..16 digits depending on region.
      *
      * @param s String to validate as phone number
-     * @return true if string appears to be a valid phone number format
-     * @return false if string does not match phone number pattern
+     * @retval true If string appears to be a valid phone number format
+     * @retval false If string does not match phone number pattern
      */
     bool looksLikePhone(const String &s);
 };
