@@ -27,6 +27,8 @@ struct connect_t
     }
 
 private:
+    friend class WifiStatus;
+    friend class WifiConnection;
     static IPAddress NULL_IP;
 };
 

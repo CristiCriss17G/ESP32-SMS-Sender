@@ -13,7 +13,7 @@ IPAddress connect_t::NULL_IP(0, 0, 0, 0);
  *
  * Initializes the WiFi status with disconnected state and null IP address.
  */
-WifiStatus::WifiStatus() : connection{false, 0U}
+WifiStatus::WifiStatus() : connection{false, connect_t::NULL_IP}
 {
     ProbeRegistry::instance().registerProbe("wifi", [this](JsonObject &dst)
                                             { this->toJson(dst); });
@@ -173,7 +173,7 @@ connect_t WifiConnection::connect()
     if (isConnectionTrying)
     {
         Serial.println("Connection already in progress");
-        return {false, 0U};
+        return {false, connect_t::NULL_IP};
     }
     isConnectionTrying = true;
     WiFi.mode(WIFI_STA);
@@ -193,7 +193,7 @@ connect_t WifiConnection::connect()
     {
         Serial.println("Could not connect to network");
         isConnectionTrying = false;
-        return {false, 0U};
+        return {false, connect_t::NULL_IP};
     }
     isConnectionTrying = false;
     wifiStatus.updateConnection({true, WiFi.localIP()});

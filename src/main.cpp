@@ -46,6 +46,9 @@
 #define SD_CS 13   ///< SD card SPI chip select pin
 #define LED_PIN 12 ///< Status LED pin
 
+#define BLE_MTU 247                       ///< Maximum BLE MTU size
+#define BLE_ADVERTISING_TIMEOUT_MINUTES 5 ///< Minutes to keep BLE advertising active
+
 Modem modem; ///< Global modem object
 
 // Global objects
@@ -85,7 +88,7 @@ void bluetoothSetup()
   // Bonding=true, MITM=false, LESC=true (LE Secure Connections Just Works)
   NimBLEDevice::setSecurityAuth(/*bond=*/true, /*mitm=*/false, /*lesc=*/true);
   NimBLEDevice::setSecurityIOCap(BLE_HS_IO_NO_INPUT_OUTPUT); // triggers Just Works
-  NimBLEDevice::setMTU(247);                                 // Max MTU size
+  NimBLEDevice::setMTU(BLE_MTU);                             // Max MTU size
 
   // Create BLE server
   pServer = NimBLEDevice::createServer();
@@ -148,7 +151,7 @@ void bluetoothSetup()
  */
 void bluetoothChangeStatus()
 {
-  if (settings.getUptime() > 5 * MINUTE)
+  if (settings.getUptime() > BLE_ADVERTISING_TIMEOUT_MINUTES * MINUTE)
   {
     Serial.println(F("[BLE] Stop advertising"));
     pServer->getAdvertising()->stop();
