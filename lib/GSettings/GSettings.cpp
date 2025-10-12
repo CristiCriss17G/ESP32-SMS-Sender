@@ -6,6 +6,14 @@
 #include "GSettings.hpp"
 
 /**
+ * @brief Static initialization of program start timestamp
+ *
+ * Captures the millis() value when the program begins, used by getUptime()
+ * to calculate runtime duration across all GSettings instances.
+ */
+uint64_t GSettings::startTime = millis();
+
+/**
  * @brief Construct a new GSettings object with default values
  *
  * Initializes all settings with sensible defaults. The device name
@@ -14,8 +22,7 @@
 GSettings::GSettings() : deviceName("ESP32-BLE-Example"), ssid(""), password("")
 {
     ProbeRegistry::instance().registerProbe("settings", [this](JsonObject &dst)
-                                            {
-                                                this->toJson(dst); });
+                                            { this->toJson(dst); });
 }
 
 /**
@@ -124,4 +131,14 @@ void GSettings::toJson(JsonObject &root)
     root["deviceName"] = deviceName;
     root["ssid"] = ssid;
     root["password"] = password.isEmpty() ? "" : password.substring(0, 4) + "****";
+}
+
+/**
+ * @brief Get system uptime in milliseconds
+ *
+ * @return uint64_t
+ */
+uint64_t GSettings::getUptime()
+{
+    return (millis() - startTime);
 }

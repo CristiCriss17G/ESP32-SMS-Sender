@@ -1,6 +1,11 @@
 #include "WifiConnection.hpp"
 
-// Definition of static member
+/**
+ * @brief Static null IP address constant for connect_t initialization
+ *
+ * Provides a default "no address" value (0.0.0.0) used when WiFi connection
+ * fails or is not established. Prevents null pointer dereference issues.
+ */
 IPAddress connect_t::NULL_IP(0, 0, 0, 0);
 
 /**

@@ -13,7 +13,7 @@
  *
  * @param wifiStatus Reference to WiFi status tracker
  */
-ServerCallbacks::ServerCallbacks(WifiStatus &wifiStatus) : wifiStatus(wifiStatus)
+ServerCallbacks::ServerCallbacks(WifiStatus &wifiStatus, GSettings &settings) : wifiStatus(wifiStatus), settings(settings)
 {
     pAdvertising = NimBLEDevice::getAdvertising();
 }
@@ -30,8 +30,13 @@ ServerCallbacks::ServerCallbacks(WifiStatus &wifiStatus) : wifiStatus(wifiStatus
 void ServerCallbacks::onConnect(NimBLEServer *pServer, NimBLEConnInfo &connInfo)
 {
     deviceConnected = true;
-    Serial.println("Client connected");
+    Serial.println(F("Client connected"));
     Serial.print(connInfo.getAddress().toString().c_str());
+    Serial.printf("Connected. Encrypted=%d, Bonded=%d, Authenticated=%d, MTU=%d\n",
+                  connInfo.isEncrypted(),
+                  connInfo.isBonded(),
+                  connInfo.isAuthenticated(),
+                  connInfo.getMTU());
 }
 
 /**
@@ -47,13 +52,31 @@ void ServerCallbacks::onConnect(NimBLEServer *pServer, NimBLEConnInfo &connInfo)
 void ServerCallbacks::onDisconnect(NimBLEServer *pServer, NimBLEConnInfo &connInfo, int reason)
 {
     deviceConnected = false;
-    Serial.println("Client disconnected");
-    if (!wifiStatus.isWifiConnected())
+    Serial.println(F("Client disconnected"));
+    if (settings.getUptime() < 5 * MINUTE)
     {
         // Resume advertising since WiFi is not connected
         pAdvertising->start();
-        Serial.println("Advertising resumed");
+        Serial.println(F("Advertising resumed"));
     }
+}
+
+/**
+ * @brief Handle BLE authentication completion events
+ *
+ * @param connInfo Connection information structure
+ */
+void ServerCallbacks::onAuthenticationComplete(NimBLEConnInfo &connInfo)
+{
+    if (!connInfo.isEncrypted())
+    {
+        Serial.println(F("Auth failed or not encrypted; disconnecting."));
+        NimBLEDevice::getServer()->disconnect(connInfo);
+        return;
+    }
+    Serial.printf("Pairing OK. Encrypted=%d Bonded=%d\n",
+                  connInfo.isEncrypted(),
+                  connInfo.isBonded());
 }
 
 /**
@@ -114,10 +137,17 @@ CharacteristicCallbacks::CharacteristicCallbacks(GSettings &settings, WifiConnec
  */
 void CharacteristicCallbacks::onRead(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo)
 {
-    Serial.println("Read request received");
+    if (!connInfo.isEncrypted())
+    {
+        // Should not happen if permissions set correctly; reject anyway
+        Serial.println(F("Read rejected: not encrypted"));
+        return;
+    }
+    Serial.println(F("Read request received"));
     // Allocate the JSON document
     String output = ProbeRegistry::instance().collectAllAsJson();
-    Serial.println("Sending response: " + output);
+    Serial.print(F("Sending response: "));
+    Serial.println(output);
     pCharacteristic->setValue(output.c_str());
 }
 
@@ -151,17 +181,24 @@ void CharacteristicCallbacks::onRead(NimBLECharacteristic *pCharacteristic, NimB
  */
 void CharacteristicCallbacks::onWrite(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo)
 {
+    if (!connInfo.isEncrypted())
+    {
+        // Should not happen if permissions set correctly; reject anyway
+        Serial.println(F("Write rejected: not encrypted"));
+        return;
+    }
+
     std::string rxValue = pCharacteristic->getValue();
     if (rxValue.length() > 0)
     {
-        Serial.println("Received WiFi credentials!");
+        Serial.println(F("Received WiFi credentials!"));
         // Serial.printf("Received: %s\n", rxValue.c_str());
 
         JsonDocument doc;
         DeserializationError error = deserializeJson(doc, rxValue.c_str());
         if (error)
         {
-            Serial.print("Failed to parse JSON: ");
+            Serial.print(F("Failed to parse JSON: "));
             Serial.println(error.c_str());
             return;
         }
@@ -190,14 +227,14 @@ void CharacteristicCallbacks::onWrite(NimBLECharacteristic *pCharacteristic, Nim
         {
             if (wifiConnection.getStatus().isWifiConnected())
             {
-                Serial.println("Disconnecting from WiFi...");
+                Serial.println(F("Disconnecting from WiFi..."));
                 wifiConnection.disconnect();
             }
-            Serial.println("Connecting to WiFi...");
+            Serial.println(F("Connecting to WiFi..."));
             connect_t result = wifiConnection.connect();
             if (result.isConnected)
             {
-                Serial.println("Connected to WiFi!");
+                Serial.println(F("Connected to WiFi!"));
                 wifiConnection.getStatus().setWifiConnected(true);
                 wifiConnection.getStatus().setIpAddress(result.ip);
                 if (notifyCharacteristic != nullptr)
@@ -207,7 +244,7 @@ void CharacteristicCallbacks::onWrite(NimBLECharacteristic *pCharacteristic, Nim
             }
             else
             {
-                Serial.println("Failed to connect to WiFi!");
+                Serial.println(F("Failed to connect to WiFi!"));
                 wifiConnection.getStatus().setWifiConnected(false);
                 if (notifyCharacteristic != nullptr)
                 {
@@ -217,7 +254,7 @@ void CharacteristicCallbacks::onWrite(NimBLECharacteristic *pCharacteristic, Nim
         }
         if (newServerInfo)
         {
-            Serial.println("New server info received! Needs restart to apply changes.");
+            Serial.println(F("New server info received! Needs restart to apply changes."));
             if (notifyCharacteristic != nullptr)
             {
                 notifyCharacteristic->notify(String("S:SI,NR"));
@@ -225,7 +262,7 @@ void CharacteristicCallbacks::onWrite(NimBLECharacteristic *pCharacteristic, Nim
         }
         if (doc["restart"].is<bool>() && doc["restart"].as<bool>())
         {
-            Serial.println("Restarting esp32 to apply new settings...");
+            Serial.println(F("Restarting esp32 to apply new settings..."));
             ESP.restart();
         }
     }

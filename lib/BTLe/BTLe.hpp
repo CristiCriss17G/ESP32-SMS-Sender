@@ -44,8 +44,9 @@ public:
      * @brief Construct a new ServerCallbacks object
      *
      * @param wifiStatus Reference to WiFi status tracker for advertising decisions
+     * @param settings Reference to global settings for device configuration
      */
-    ServerCallbacks(WifiStatus &wifiStatus);
+    ServerCallbacks(WifiStatus &wifiStatus, GSettings &settings);
 
     /**
      * @brief Handle client connection events
@@ -71,6 +72,16 @@ public:
     void onDisconnect(NimBLEServer *pServer, NimBLEConnInfo &connInfo, int reason) override;
 
     /**
+     * @brief Handle BLE authentication completion events
+     *
+     * Called when a BLE client completes the authentication process.
+     * Validates the connection information and logs the result.
+     *
+     * @param connInfo Connection information structure
+     */
+    void onAuthenticationComplete(NimBLEConnInfo &connInfo) override;
+
+    /**
      * @brief Get the advertising interface
      *
      * @return NimBLEAdvertising* Pointer to the BLE advertising object
@@ -88,6 +99,7 @@ public:
 protected:
     bool deviceConnected = false;    ///< Flag indicating if a BLE client is connected
     WifiStatus &wifiStatus;          ///< Reference to WiFi status for advertising logic
+    GSettings &settings;             ///< Reference to global settings manager
     NimBLEAdvertising *pAdvertising; ///< Pointer to BLE advertising interface
 };
 
