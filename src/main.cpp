@@ -40,14 +40,14 @@
 #include "HTTPServer.hpp"
 #include "Modem.hpp"
 
-#define SECOND 1000l  // 1 second
-#define MINUTE 60000l // 1 minute
-
 #define SD_MISO 2  ///< SD card SPI MISO pin
 #define SD_MOSI 15 ///< SD card SPI MOSI pin
 #define SD_SCLK 14 ///< SD card SPI clock pin
 #define SD_CS 13   ///< SD card SPI chip select pin
 #define LED_PIN 12 ///< Status LED pin
+
+#define BLE_MTU 247                       ///< Maximum BLE MTU size
+#define BLE_ADVERTISING_TIMEOUT_MINUTES 5 ///< Minutes to keep BLE advertising active
 
 Modem modem; ///< Global modem object
 
@@ -56,11 +56,11 @@ GSettings settings;                      ///< Global settings manager
 WifiConnection wifiConnection(settings); ///< WiFi connection manager
 
 // BLE objects
-NimBLEServer *pServer = nullptr;                                ///< BLE server instance
-NimBLECharacteristic *notifyCharacteristic = nullptr;           ///< BLE notification characteristic
-ServerCallbacks serverCallbacks(wifiConnection.getStatus());    ///< BLE server event callbacks
-CharacteristicCallbacks chrCallbacks(settings, wifiConnection); ///< BLE characteristic callbacks
-HTTPServer *httpServer;                                         ///< HTTP server instance
+NimBLEServer *pServer = nullptr;                                       ///< BLE server instance
+NimBLECharacteristic *notifyCharacteristic = nullptr;                  ///< BLE notification characteristic
+ServerCallbacks serverCallbacks(wifiConnection.getStatus(), settings); ///< BLE server event callbacks
+CharacteristicCallbacks chrCallbacks(settings, wifiConnection);        ///< BLE characteristic callbacks
+HTTPServer *httpServer;                                                ///< HTTP server instance
 /**
  * @brief Initialize and configure Bluetooth Low Energy (BLE) functionality
  *
@@ -85,6 +85,11 @@ void bluetoothSetup()
   // Initialize BLE
   NimBLEDevice::init(settings.getDeviceName().c_str());
 
+  // Bonding=true, MITM=false, LESC=true (LE Secure Connections Just Works)
+  NimBLEDevice::setSecurityAuth(/*bond=*/true, /*mitm=*/false, /*lesc=*/true);
+  NimBLEDevice::setSecurityIOCap(BLE_HS_IO_NO_INPUT_OUTPUT); // triggers Just Works
+  NimBLEDevice::setMTU(BLE_MTU);                             // Max MTU size
+
   // Create BLE server
   pServer = NimBLEDevice::createServer();
   pServer->setCallbacks(&serverCallbacks);
@@ -96,8 +101,8 @@ void bluetoothSetup()
   // Write characteristic for incoming WiFi credentials
   NimBLECharacteristic *writeCharacteristic = pService->createCharacteristic(
       CHAR_READ_WRITE_UUID,
-      NIMBLE_PROPERTY::READ |
-          NIMBLE_PROPERTY::WRITE);
+      NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::READ_ENC |
+          NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR | NIMBLE_PROPERTY::WRITE_ENC);
   writeCharacteristic->setValue("Data");
   writeCharacteristic->setCallbacks(&chrCallbacks);
 
@@ -134,47 +139,22 @@ void bluetoothSetup()
 }
 
 /**
- * @brief Manage BLE advertising based on WiFi connection status
+ * @brief Manage BLE advertising state
  *
- * Implements intelligent advertising management:
- * - Stops BLE advertising when WiFi is connected (after 5 minutes)
- * - Resumes BLE advertising when WiFi is disconnected (after 5 minutes)
+ * Stops BLE advertising if the device has been up for more than 5 minutes,
+ * to reduce power consumption. If the device uptime is less than 5 minutes,
+ * advertising continues to allow for configuration.
  *
- * This approach conserves power and reduces BLE interference when
- * the device is successfully connected to WiFi and operating normally.
- * BLE remains available for reconfiguration when WiFi is unavailable.
+ * This function should be called periodically in the main loop.
  *
- * @note Uses a 5-minute timer to prevent rapid advertising state changes
+ * @note Advertising is only stopped if the device has been running
  */
 void bluetoothChangeStatus()
 {
-  static uint64_t last = millis();
-
-  if (wifiConnection.getStatus().isWifiConnected())
+  if (settings.getUptime() > BLE_ADVERTISING_TIMEOUT_MINUTES * MINUTE)
   {
-    // If 5 minutes have passed since last action
-    if (millis() - last > 5 * MINUTE)
-    {
-      // wifiConnection.getStatus().setConnected(true);
-      Serial.println("Stop advertising");
-      pServer->getAdvertising()->stop();
-
-      // Reset the timer here
-      last = millis();
-    }
-  }
-  else
-  {
-    // If 5 minutes have passed since last action
-    if (millis() - last > 5 * MINUTE)
-    {
-      // wifiConnection.getStatus().setConnected(false);
-      Serial.println("Start advertising");
-      pServer->getAdvertising()->start();
-
-      // Reset the timer here
-      last = millis();
-    }
+    Serial.println(F("[BLE] Stop advertising"));
+    pServer->getAdvertising()->stop();
   }
 }
 
@@ -222,7 +202,7 @@ void setup()
   {
     Serial.println("Connected to WiFi!");
     Serial.print("IP Address: ");
-    Serial.println(*result.ip);
+    Serial.println(result.ip);
   }
   else
   {

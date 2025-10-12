@@ -11,13 +11,36 @@ const CarrierProfile *DEFAULT_PROFILE = nullptr; // if unknown operator
 
 #ifdef DUMP_AT_COMMANDS
 StreamDebugger debugger(SerialAT, SerialMon);
+/**
+ * @brief Construct Modem with AT command debugging enabled
+ *
+ * Initializes TinyGSM modem instance with StreamDebugger wrapper for
+ * AT command visibility. Also registers a "modem" probe for status reporting.
+ */
 Modem::Modem() : modem(debugger)
 #else
+/**
+ * @brief Construct Modem with direct serial communication
+ *
+ * Initializes TinyGSM modem instance with direct SerialAT communication.
+ * Also registers a "modem" probe for status reporting.
+ */
 Modem::Modem() : modem(SerialAT)
 #endif
 {
+    ProbeRegistry::instance().registerProbe("modem", [this](JsonObject &dst)
+                                            {
+        dst["registered"] = isCsRegistered();
+        dst["rssi"]       = modem.getSignalQuality();
+        dst["mode"]       = modem.getNetworkMode(); });
 }
 
+/**
+ * @brief Destroy the Modem object
+ *
+ * Clean destructor for the Modem class. The TinyGSM modem instance
+ * is automatically cleaned up by its own destructor.
+ */
 Modem::~Modem()
 {
 }

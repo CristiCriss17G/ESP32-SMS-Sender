@@ -2,6 +2,10 @@
 
 #include <Preferences.h>
 #include <ArduinoJson.h>
+#include "ProbeRegistry.hpp"
+
+#define SECOND 1000l  // 1 second
+#define MINUTE 60000l // 1 minute
 
 /**
  * @brief Global settings manager class
@@ -119,9 +123,27 @@ public:
      */
     void toJson(JsonObject &root);
 
+    /**
+     * @brief Get system uptime in milliseconds since program start
+     *
+     * Returns the elapsed time since the device was powered on or reset.
+     * Useful for monitoring device stability and tracking runtime metrics.
+     *
+     * @return uint64_t Number of milliseconds since system startup
+     */
+    uint64_t getUptime();
+
 private:
-    String deviceName;
-    String ssid;
-    String password;
-    Preferences preferences;
+    String deviceName;       ///< Device name for BLE advertising and identification
+    String ssid;             ///< WiFi network SSID for connection attempts
+    String password;         ///< WiFi network password for authentication
+    Preferences preferences; ///< ESP32 NVS storage interface for settings persistence
+
+    /**
+     * @brief Static timestamp marking when the program started
+     *
+     * Used by getUptime() to calculate elapsed runtime since device power-on.
+     * Initialized once during the first GSettings object construction.
+     */
+    static uint64_t startTime;
 };

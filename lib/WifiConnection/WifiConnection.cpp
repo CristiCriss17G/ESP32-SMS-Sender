@@ -1,11 +1,23 @@
 #include "WifiConnection.hpp"
 
 /**
+ * @brief Static null IP address constant for connect_t initialization
+ *
+ * Provides a default "no address" value (0.0.0.0) used when WiFi connection
+ * fails or is not established. Prevents null pointer dereference issues.
+ */
+IPAddress connect_t::NULL_IP(0, 0, 0, 0);
+
+/**
  * @brief Construct a new WifiStatus object
  *
  * Initializes the WiFi status with disconnected state and null IP address.
  */
-WifiStatus::WifiStatus() : connection{false, nullptr} {}
+WifiStatus::WifiStatus() : connection{false, connect_t::NULL_IP}
+{
+    ProbeRegistry::instance().registerProbe("wifi", [this](JsonObject &dst)
+                                            { this->toJson(dst); });
+}
 
 /**
  * @brief Destroy the WifiStatus object
@@ -14,10 +26,6 @@ WifiStatus::WifiStatus() : connection{false, nullptr} {}
  */
 WifiStatus::~WifiStatus()
 {
-    if (connection.ip)
-    {
-        delete connection.ip;
-    }
 }
 
 /**
@@ -28,7 +36,7 @@ WifiStatus::~WifiStatus()
  */
 bool WifiStatus::isWifiConnected()
 {
-    return connection.isConnected;
+    return WiFi.status() == WL_CONNECTED;
 }
 
 /**
@@ -50,7 +58,15 @@ void WifiStatus::setWifiConnected(bool connected)
  */
 String WifiStatus::getIpAddress()
 {
-    return connection.ip ? connection.ip->toString() : "0.0.0.0";
+    static uint32_t lastRead = 0;
+    if (millis() - lastRead > 60000 || connection.isIPNULL())
+    {
+        // Refresh IP address every 60 seconds or if not set
+        connection.ip = IPAddress(WiFi.localIP());
+        lastRead = millis();
+        Serial.println(F("Refreshed IP address from WiFi stack"));
+    }
+    return connection.isIPNULL() ? WiFi.localIP().toString() : connection.ip.toString();
 }
 
 /**
@@ -63,8 +79,7 @@ String WifiStatus::getIpAddress()
  */
 void WifiStatus::setIpAddress(String ipAddress)
 {
-    connection.ip = new IPAddress();
-    connection.ip->fromString(ipAddress);
+    connection.ip.fromString(ipAddress);
 }
 
 /**
@@ -76,7 +91,7 @@ void WifiStatus::setIpAddress(String ipAddress)
  */
 void WifiStatus::setIpAddress(IPAddress ipAddress)
 {
-    connection.ip = new IPAddress(ipAddress);
+    connection.ip = ipAddress;
 }
 
 /**
@@ -101,8 +116,8 @@ void WifiStatus::updateConnection(connect_t connection)
  */
 void WifiStatus::toJson(JsonObject &root)
 {
-    root["connected"] = connection.isConnected;
-    root["ipAddress"] = connection.ip ? connection.ip->toString() : "0.0.0.0";
+    root["connected"] = isWifiConnected();
+    root["ipAddress"] = getIpAddress();
 }
 
 /**
@@ -112,7 +127,7 @@ void WifiStatus::toJson(JsonObject &root)
  */
 String WifiStatus::toString()
 {
-    return "Connected: " + String(connection.isConnected) + ", IP Address: " + getIpAddress();
+    return "Connected: " + String(isWifiConnected()) + ", IP Address: " + getIpAddress();
 }
 
 /**
@@ -158,7 +173,7 @@ connect_t WifiConnection::connect()
     if (isConnectionTrying)
     {
         Serial.println("Connection already in progress");
-        return {false, NULL};
+        return {false, connect_t::NULL_IP};
     }
     isConnectionTrying = true;
     WiFi.mode(WIFI_STA);
@@ -178,11 +193,11 @@ connect_t WifiConnection::connect()
     {
         Serial.println("Could not connect to network");
         isConnectionTrying = false;
-        return {false, NULL};
+        return {false, connect_t::NULL_IP};
     }
     isConnectionTrying = false;
-    wifiStatus.updateConnection({true, new IPAddress(WiFi.localIP())});
-    return {true, new IPAddress(WiFi.localIP())};
+    wifiStatus.updateConnection({true, WiFi.localIP()});
+    return {true, WiFi.localIP()};
 }
 
 /**

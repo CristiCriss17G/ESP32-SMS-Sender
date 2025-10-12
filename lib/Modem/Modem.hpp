@@ -1,19 +1,20 @@
 #pragma once
+#include "ProbeRegistry.hpp"
 
 #define TINY_GSM_MODEM_SIM7000
 #define TINY_GSM_DEBUG Serial   // comment this to reduce logs
 #define TINY_GSM_RX_BUFFER 1024 // Set RX buffer to 1Kb
 
-#define GSM_NL "\r\n"
+#define GSM_NL "\r\n" ///< GSM command line terminator (carriage return + line feed)
 
-#define SerialAT Serial1
+#define SerialAT Serial1 ///< UART interface for GSM modem communication
 // Set serial for debug console (to the Serial Monitor, default speed 115200)
-#define SerialMon Serial
+#define SerialMon Serial ///< Serial interface for debug output and monitoring
 
-#define DUMP_AT_COMMANDS
+#define DUMP_AT_COMMANDS ///< Enable AT command debugging via StreamDebugger
 
 // set GSM PIN, if any
-#define GSM_PIN ""
+#define GSM_PIN "" ///< SIM card PIN (empty string if no PIN required)
 
 #include <TinyGsmClient.h>
 
