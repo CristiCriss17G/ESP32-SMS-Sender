@@ -46,9 +46,6 @@
 #define SD_CS 13   ///< SD card SPI chip select pin
 #define LED_PIN 12 ///< Status LED pin
 
-#define BLE_MTU 247                       ///< Maximum BLE MTU size
-#define BLE_ADVERTISING_TIMEOUT_MINUTES 5 ///< Minutes to keep BLE advertising active
-
 Modem modem; ///< Global modem object
 
 // Global objects
@@ -135,27 +132,7 @@ void bluetoothSetup()
   // pAdvertising->setMinPreferred(0x06); // Helps with iOS issues
   // pAdvertising->setMinPreferred(0x12);
   pAdvertising->start();
-  Serial.println("BLE device is now advertising...");
-}
-
-/**
- * @brief Manage BLE advertising state
- *
- * Stops BLE advertising if the device has been up for more than 5 minutes,
- * to reduce power consumption. If the device uptime is less than 5 minutes,
- * advertising continues to allow for configuration.
- *
- * This function should be called periodically in the main loop.
- *
- * @note Advertising is only stopped if the device has been running
- */
-void bluetoothChangeStatus()
-{
-  if (settings.getUptime() > BLE_ADVERTISING_TIMEOUT_MINUTES * MINUTE)
-  {
-    Serial.println(F("[BLE] Stop advertising"));
-    pServer->getAdvertising()->stop();
-  }
+  Serial.println(F("[BLE] BLE device is now advertising..."));
 }
 
 /**
@@ -193,20 +170,20 @@ void setup()
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, HIGH);
 
-  Serial.println(F("\n=== T-SIM7000G SMS Sender ==="));
+  Serial.println(F("\n[SETUP]=== T-SIM7000G SMS Sender ==="));
 
   modem.initModemClean();
 
   connect_t result = wifiConnection.connect();
   if (result.isConnected)
   {
-    Serial.println("Connected to WiFi!");
-    Serial.print("IP Address: ");
+    Serial.println(F("[SETUP] Connected to WiFi!"));
+    Serial.print(F("[SETUP] IP Address: "));
     Serial.println(result.ip);
   }
   else
   {
-    Serial.println("Failed to connect to WiFi!");
+    Serial.println(F("[SETUP] Failed to connect to WiFi!"));
   }
 
   httpServer = new HTTPServer(
@@ -219,6 +196,8 @@ void setup()
       { return modem.isCsRegistered(); },
       80,
       LED_PIN);
+  digitalWrite(LED_PIN, LOW);
+  Serial.println(F("[SETUP] Setup complete."));
 }
 
 /**
@@ -241,7 +220,7 @@ void setup()
  */
 void loop()
 {
-  bluetoothChangeStatus();
+  serverCallbacks.bluetoothChangeStatus();
   httpServer->handleClient();
   delay(2); // allow the cpu to switch to other tasks
 }

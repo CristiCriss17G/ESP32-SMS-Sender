@@ -24,6 +24,9 @@
 #define CHAR_READ_WRITE_UUID "c62b53d0-1848-424d-9d05-fd91e83f87a8" ///< Characteristic UUID for WiFi credential exchange
 #define CHAR_NOTIFY_UUID "6cd49c0f-0c41-475b-afc5-5d504afca7dc"     ///< Characteristic UUID for status notifications
 
+#define BLE_MTU 247                       ///< Maximum BLE MTU size
+#define BLE_ADVERTISING_TIMEOUT_MINUTES 5 ///< Minutes to keep BLE advertising active
+
 /**
  * @brief BLE Server callback handler class
  *
@@ -95,6 +98,19 @@ public:
      * @return false if no device is connected
      */
     bool isDeviceConnected();
+
+    /**
+     * @brief Manage BLE advertising state
+     *
+     * Stops BLE advertising if the device has been up for more than 5 minutes,
+     * to reduce power consumption. If the device uptime is less than 5 minutes,
+     * advertising continues to allow for configuration.
+     *
+     * This function should be called periodically in the main loop.
+     *
+     * @note Advertising is only stopped if the device has been running
+     */
+    void bluetoothChangeStatus();
 
 protected:
     bool deviceConnected = false;    ///< Flag indicating if a BLE client is connected

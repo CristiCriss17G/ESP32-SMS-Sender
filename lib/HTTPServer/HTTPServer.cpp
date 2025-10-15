@@ -20,9 +20,10 @@ HTTPServer::HTTPServer(GSettings &settings, WifiConnection &wifiConnection, SMSF
     server->on("/", HTTP_GET, std::bind(&HTTPServer::handleRoot, this));
     server->on("/send", HTTP_POST, std::bind(&HTTPServer::handleSend, this));
     server->on("/send", HTTP_OPTIONS, std::bind(&HTTPServer::handleOptions, this));
+    server->onNotFound(std::bind(&HTTPServer::handleNotFound, this));
 
     server->begin();
-    Serial.println("HTTP server started");
+    Serial.println("[HTTP] server started");
 }
 
 /**
@@ -56,7 +57,7 @@ void HTTPServer::handleClient()
  */
 void HTTPServer::handleRoot()
 {
-    digitalWrite(led, 1);
+    digitalWrite(led, HIGH);
     sendCors();
     String html = F(R"HTML(
 <!doctype html><html><head><meta charset="utf-8"><title>T-SIM7000G SMS</title>
@@ -89,12 +90,12 @@ async function send(){
 </body></html>
 )HTML");
     server->send(200, "text/html; charset=utf-8", html);
-    digitalWrite(led, 0);
+    digitalWrite(led, LOW);
 }
 
 void HTTPServer::handleNotFound()
 {
-    digitalWrite(led, 1);
+    digitalWrite(led, HIGH);
     sendCors();
     String message = "File Not Found\n\n";
     message += "URI: ";
@@ -109,7 +110,7 @@ void HTTPServer::handleNotFound()
         message += " " + server->argName(i) + ": " + server->arg(i) + "\n";
     }
     server->send(404, "text/plain", message);
-    digitalWrite(led, 0);
+    digitalWrite(led, LOW);
 }
 
 /**
@@ -137,7 +138,7 @@ void HTTPServer::handleNotFound()
  */
 void HTTPServer::handleSend()
 {
-    digitalWrite(led, 1);
+    digitalWrite(led, HIGH);
     sendCors();
 
     if (server->method() != HTTP_POST)
@@ -190,7 +191,7 @@ void HTTPServer::handleSend()
     {
         server->send(500, APPLICATION_JSON, "{\"status\":\"fail\"}");
     }
-    digitalWrite(led, 0);
+    digitalWrite(led, LOW);
 }
 
 /**
@@ -220,10 +221,10 @@ void HTTPServer::sendCors()
  */
 void HTTPServer::handleOptions()
 {
-    digitalWrite(led, 1);
+    digitalWrite(led, HIGH);
     sendCors();
     server->send(204);
-    digitalWrite(led, 0);
+    digitalWrite(led, LOW);
 }
 
 /**

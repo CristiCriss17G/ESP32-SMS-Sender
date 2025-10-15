@@ -11,7 +11,7 @@
 // Set serial for debug console (to the Serial Monitor, default speed 115200)
 #define SerialMon Serial ///< Serial interface for debug output and monitoring
 
-#define DUMP_AT_COMMANDS ///< Enable AT command debugging via StreamDebugger
+// #define DUMP_AT_COMMANDS ///< Enable AT command debugging via StreamDebugger
 
 // set GSM PIN, if any
 #define GSM_PIN "" ///< SIM card PIN (empty string if no PIN required)

@@ -64,7 +64,7 @@ String WifiStatus::getIpAddress()
         // Refresh IP address every 60 seconds or if not set
         connection.ip = IPAddress(WiFi.localIP());
         lastRead = millis();
-        Serial.println(F("Refreshed IP address from WiFi stack"));
+        Serial.println(F("[WIFI] Refreshed IP address from WiFi stack"));
     }
     return connection.isIPNULL() ? WiFi.localIP().toString() : connection.ip.toString();
 }
@@ -172,7 +172,7 @@ connect_t WifiConnection::connect()
 {
     if (isConnectionTrying)
     {
-        Serial.println("Connection already in progress");
+        Serial.println(F("[WIFI] Connection already in progress"));
         return {false, connect_t::NULL_IP};
     }
     isConnectionTrying = true;
@@ -180,7 +180,7 @@ connect_t WifiConnection::connect()
     WiFi.setHostname(settings.getDeviceName().c_str());
     WiFi.setAutoReconnect(true);
     WiFi.begin(settings.getSsid().c_str(), settings.getPassword().c_str());
-    Serial.println("Connecting to WiFi...");
+    Serial.println(F("[WIFI] Connecting to WiFi..."));
     int maxRetries = 40; // Wait for a maximum of 20 seconds (40 * 500ms = 20s)
     int i = 0;
     while (WiFi.status() != WL_CONNECTED && i < maxRetries)
@@ -191,7 +191,7 @@ connect_t WifiConnection::connect()
     }
     if (WiFi.status() != WL_CONNECTED && i == maxRetries)
     {
-        Serial.println("Could not connect to network");
+        Serial.println(F("[WIFI] Could not connect to network"));
         isConnectionTrying = false;
         return {false, connect_t::NULL_IP};
     }
@@ -214,7 +214,7 @@ bool WifiConnection::disconnect()
 {
     if (WiFi.status() == WL_CONNECTED && WiFi.disconnect(true))
     {
-        Serial.println("Disconnected from WiFi");
+        Serial.println(F("[WIFI] Disconnected from WiFi"));
         return true;
     }
     return false;
